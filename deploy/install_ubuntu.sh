@@ -3,14 +3,17 @@
 # Pode ser executado de novo com segurança: .env, banco e fotos são preservados.
 #
 # Variáveis opcionais:
-#   DOMAIN=pservice.exemplo.com.br   domínio (recomendado)
-#   CERTBOT_EMAIL=voce@exemplo.com   se definido, emite o HTTPS automaticamente
+#   DOMAIN=pservice.exemplo.com.br   domínio (sem ele, o sistema responde pelo IP)
+#   IP_ADDRESS=142.93.115.155        IP público (detectado sozinho se omitido)
+#   CERTBOT_EMAIL=voce@exemplo.com   se definido, emite HTTPS (Let's Encrypt) para o
+#                                    domínio ou, sem domínio, para o próprio IP (certificado de 6 dias, renovação automática)
 #   ADMIN_EMAIL / ADMIN_NAME / ADMIN_PASSWORD   admin inicial (só na 1ª instalação)
 #   APP_DIR=/var/www/pservice        pasta de instalação
 set -euo pipefail
 
 APP_DIR="${APP_DIR:-/var/www/pservice}"
 DOMAIN="${DOMAIN:-}"
+IP_ADDRESS="${IP_ADDRESS:-}"
 CERTBOT_EMAIL="${CERTBOT_EMAIL:-}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@pservice.local}"
 ADMIN_NAME="${ADMIN_NAME:-Administrador}"
@@ -32,7 +35,7 @@ if [[ $FIRST_INSTALL -eq 1 && -z "$ADMIN_PASSWORD" ]]; then
   [[ ${#ADMIN_PASSWORD} -ge 8 ]] || { echo 'Senha muito curta.'; exit 1; }
 fi
 
-if [[ -z "$DOMAIN" ]] && ls /etc/nginx/sites-enabled/ 2>/dev/null | grep -vq '^default$'; then
+if [[ -z "$DOMAIN" ]] && ls /etc/nginx/sites-enabled/ 2>/dev/null | grep -vqE '^(default|pservice)$'; then
   echo "ATENÇÃO: já existem outros sites no Nginx desta VPS."
   echo "Sem DOMAIN definido o PService responderia como site padrão e poderia conflitar."
   echo "Rode novamente com: sudo DOMAIN=pservice.seudominio.com.br bash deploy/install_ubuntu.sh"
@@ -47,6 +50,11 @@ if ! apt-cache show "php${PHP_V}-fpm" >/dev/null 2>&1; then
   add-apt-repository -y ppa:ondrej/php && apt-get update -q
 fi
 apt-get install -y -q php${PHP_V}-{fpm,cli,common,sqlite3,mysql,mbstring,xml,curl,zip,gd,bcmath,intl}
+
+if [[ -z "$IP_ADDRESS" ]]; then
+  IP_ADDRESS="$(curl -fsS4 --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')"
+fi
+CERT_NAME="${DOMAIN:-$IP_ADDRESS}"
 
 if ! command -v composer >/dev/null; then
   log "Composer"
@@ -69,8 +77,7 @@ mkdir -p storage/app/private storage/app/tmp storage/framework/{cache/data,sessi
 
 if [[ $FIRST_INSTALL -eq 1 ]]; then
   log "Criando .env"
-  APP_URL="${DOMAIN:+https://$DOMAIN}"; APP_URL="${APP_URL:-http://$(hostname -I | awk '{print $1}')}"
-  sed -e "s#^APP_URL=.*#APP_URL=$APP_URL#" .env.example > .env
+  sed -e "s#^APP_URL=.*#APP_URL=http://$CERT_NAME#" .env.example > .env
   echo "DB_DATABASE=$APP_DIR/database/database.sqlite" >> .env
 else
   log ".env existente preservado"
@@ -120,11 +127,11 @@ systemctl restart php${PHP_V}-fpm
 
 log "Nginx"
 SERVER_NAME="${DOMAIN:-_}"
-cat >/etc/nginx/sites-available/pservice <<NGINX
-server {
-    listen 80;
-    listen [::]:80;
-    server_name $SERVER_NAME;
+LIVE="/etc/letsencrypt/live/$CERT_NAME"
+
+write_nginx() {  # $1 = "ssl" quando já existe certificado
+  local app_block
+  app_block=$(cat <<BLOCK
     root $APP_DIR/public;
     index index.php;
     charset utf-8;
@@ -146,13 +153,85 @@ server {
         fastcgi_pass unix:/run/php/php${PHP_V}-fpm.sock;
         fastcgi_read_timeout 300;
     }
-    location ^~ /.well-known/acme-challenge/ { allow all; }
     location ~ /\.(?!well-known) { deny all; }
+BLOCK
+)
+  if [[ "${1:-}" == ssl ]]; then
+    cat >/etc/nginx/sites-available/pservice <<NGINX
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $SERVER_NAME;
+    # desafio do Let's Encrypt precisa continuar em HTTP para as renovações
+    location ^~ /.well-known/acme-challenge/ { root $APP_DIR/public; }
+    location / { return 301 https://\$host\$request_uri; }
+}
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name $SERVER_NAME;
+    ssl_certificate     $LIVE/fullchain.pem;
+    ssl_certificate_key $LIVE/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+$app_block
 }
 NGINX
-ln -sf /etc/nginx/sites-available/pservice /etc/nginx/sites-enabled/pservice
-[[ -z "$DOMAIN" ]] && rm -f /etc/nginx/sites-enabled/default
-nginx -t && systemctl reload nginx
+  else
+    cat >/etc/nginx/sites-available/pservice <<NGINX
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $SERVER_NAME;
+    location ^~ /.well-known/acme-challenge/ { root $APP_DIR/public; }
+$app_block
+}
+NGINX
+  fi
+  ln -sf /etc/nginx/sites-available/pservice /etc/nginx/sites-enabled/pservice
+  [[ -z "$DOMAIN" ]] && rm -f /etc/nginx/sites-enabled/default
+  nginx -t && systemctl reload nginx
+}
+
+if [[ -f "$LIVE/fullchain.pem" ]]; then write_nginx ssl; else write_nginx; fi
+
+if [[ -n "$CERTBOT_EMAIL" && ! -f "$LIVE/fullchain.pem" ]]; then
+  log "HTTPS (Let's Encrypt) para $CERT_NAME"
+  # Certbot via snap: certificado para IP exige versão 5.4+ (a do apt é antiga).
+  apt-get remove -y -q certbot python3-certbot-nginx >/dev/null 2>&1 || true
+  snap install --classic certbot >/dev/null
+  ln -sf /snap/bin/certbot /usr/bin/certbot
+  CB_ARGS=(certonly --webroot -w "$APP_DIR/public" --agree-tos -m "$CERTBOT_EMAIL" --non-interactive
+           --deploy-hook "systemctl reload nginx")
+  if [[ -z "$DOMAIN" ]]; then
+    CB_VER="$(certbot --version 2>&1 | awk '{print $2}')"
+    if [[ "$(printf '%s\n5.4.0\n' "$CB_VER" | sort -V | head -1)" != "5.4.0" ]]; then
+      echo "Certbot $CB_VER não emite certificado para IP (precisa 5.4+). Seguindo em HTTP."
+    else
+      CB_ARGS+=(--preferred-profile shortlived --ip-address "$IP_ADDRESS")
+    fi
+  else
+    CB_ARGS+=(-d "$DOMAIN")
+  fi
+  if [[ " ${CB_ARGS[*]} " == *" --ip-address "* || -n "$DOMAIN" ]] && certbot "${CB_ARGS[@]}"; then
+    RENEW_CONF="/etc/letsencrypt/renewal/$CERT_NAME.conf"
+    if [[ -z "$DOMAIN" && -f "$RENEW_CONF" ]]; then
+      # certificado de 6 dias: renova com 2 dias de antecedência (o timer do certbot roda 2x ao dia)
+      sed -i '/^#\? *renew_before_expiry/d' "$RENEW_CONF"
+      sed -i '1i renew_before_expiry = 2 days' "$RENEW_CONF"
+    fi
+    write_nginx ssl
+  else
+    echo "Não foi possível emitir o certificado. O sistema segue em HTTP; rode o instalador de novo depois."
+  fi
+fi
+
+log "URL e cookies"
+if [[ -f "$LIVE/fullchain.pem" ]]; then SCHEME=https; SECURE=true; else SCHEME=http; SECURE=false; fi
+sed -i "s#^APP_URL=.*#APP_URL=$SCHEME://$CERT_NAME#" .env
+if grep -q '^SESSION_SECURE_COOKIE=' .env; then sed -i "s/^SESSION_SECURE_COOKIE=.*/SESSION_SECURE_COOKIE=$SECURE/" .env; else echo "SESSION_SECURE_COOKIE=$SECURE" >> .env; fi
+as_web php artisan config:cache >/dev/null
 
 log "Agendador (backup diário 02:30 e limpezas)"
 cat >/etc/cron.d/pservice <<CRON
@@ -161,20 +240,9 @@ CRON
 chmod 644 /etc/cron.d/pservice
 rm -f /etc/cron.d/pservice-backup   # agendamento antigo (v1)
 
-if [[ -n "$DOMAIN" && -n "$CERTBOT_EMAIL" ]]; then
-  log "HTTPS (Let's Encrypt)"
-  apt-get install -y -q certbot python3-certbot-nginx
-  if certbot --nginx -d "$DOMAIN" --redirect --agree-tos -m "$CERTBOT_EMAIL" --non-interactive; then
-    if grep -q '^SESSION_SECURE_COOKIE=' .env; then sed -i 's/^SESSION_SECURE_COOKIE=.*/SESSION_SECURE_COOKIE=true/' .env; else echo 'SESSION_SECURE_COOKIE=true' >> .env; fi
-    sed -i 's#^APP_URL=http://#APP_URL=https://#' .env
-    as_web php artisan config:cache >/dev/null
-  else
-    echo "Certbot falhou (DNS já aponta para esta VPS?). O sistema segue em HTTP."
-  fi
-fi
-
 echo
 echo "✅ PService instalado em $APP_DIR"
+[[ "$SCHEME" == http ]] && echo "⚠️  Sem HTTPS: o app não fica instalável como PWA e a senha trafega sem criptografia. Rode de novo com CERTBOT_EMAIL=... para ativar."
 grep '^APP_URL=' .env
 [[ $FIRST_INSTALL -eq 1 ]] && echo "Login: $ADMIN_EMAIL"
 grep -q '^BACKUP_RCLONE_REMOTE=.\+' .env || echo "⚠️  Configure BACKUP_RCLONE_REMOTE no .env para ter cópia das fotos fora da VPS (veja DEPLOY_VPS.md)."

@@ -1,10 +1,28 @@
 # Instalação do PService em VPS Ubuntu (22.04 / 24.04)
 
+## Instalação só com IP (sem domínio)
+
+```bash
+sudo apt-get update && sudo apt-get install -y git
+sudo git clone https://github.com/pablogalindo159/pservice.git /var/www/pservice
+cd /var/www/pservice
+sudo IP_ADDRESS=142.93.115.155 \
+     CERTBOT_EMAIL=voce@seudominio.com.br \
+     ADMIN_EMAIL=voce@seudominio.com.br \
+     bash deploy/install_ubuntu.sh
+```
+
+Acesse `https://142.93.115.155`. Com `CERTBOT_EMAIL`, o Let's Encrypt emite um certificado para o próprio IP: vale 6 dias e o certbot renova sozinho (o instalador configura a renovação com 2 dias de folga). Sem `CERTBOT_EMAIL` o sistema funciona em HTTP, mas o PWA não fica instalável e a senha trafega sem criptografia.
+
+Para conferir a renovação: `sudo certbot renew --dry-run`.
+
+Quando tiver domínio, aponte o DNS e rode o instalador de novo com `DOMAIN=` e `CERTBOT_EMAIL=`: ele preserva tudo e troca a URL e o certificado.
+
 ## 1. DNS
 
 Crie um registro **A** apontando `pservice.seudominio.com.br` para o IP da VPS.
 
-## 2. Instalação (via GitHub)
+## 2. Instalação com domínio (via GitHub)
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git
