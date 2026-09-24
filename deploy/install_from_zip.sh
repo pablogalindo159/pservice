@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
+# Instala/atualiza a partir de um ZIP do projeto. Prefira o fluxo via git (DEPLOY_VPS.md).
 set -euo pipefail
 ZIP="${1:-}"
-[[ -n "$ZIP" && -f "$ZIP" ]] || { echo "Uso: sudo bash install_from_zip.sh /caminho/pservice-final.zip"; exit 1; }
+[[ -n "$ZIP" && -f "$ZIP" ]] || { echo "Uso: sudo bash install_from_zip.sh /caminho/pservice.zip"; exit 1; }
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 unzip -q "$ZIP" -d "$TMP"
