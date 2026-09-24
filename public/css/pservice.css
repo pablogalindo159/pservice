@@ -75,3 +75,15 @@ form.inline select{padding:8px}form.inline .secondary{padding:8px 12px}
 .viewer .counter{position:absolute;top:22px;left:50%;transform:translateX(-50%);color:#fff;font-weight:800;font-size:14px;background:#0008;padding:5px 12px;border-radius:20px}
 .viewer.single .counter{display:none}
 @media(max-width:900px){.viewer .nav{width:42px;height:42px;font-size:28px;line-height:40px;background:#ffffffb3}.viewer .nav.prev{left:6px}.viewer .nav.next{right:6px}}
+
+/* visualizador: original em alta resolução */
+.viewer .back-original{display:none;position:absolute;top:15px;left:15px;background:#fff;color:#111;border-radius:22px;padding:11px 16px;font-size:15px;z-index:2;box-shadow:0 4px 14px #0005}
+.viewer.original .back-original{display:block}
+.viewer.original .nav,.viewer.original .counter{display:none}
+.viewer.original{overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom}
+.viewer.original img{cursor:zoom-in}
+.viewer.original.zoomed{display:block;padding:70px 0 20px}
+.viewer.original.zoomed img{max-width:none;max-height:none;width:250%;cursor:zoom-out}
+.viewer.original.zoomed .viewer-bar{display:none}
+.viewer.original.zoomed .back-original,.viewer.original.zoomed .close{position:fixed}
+.viewer.loading::after{content:"Carregando original…";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;background:#0009;padding:10px 16px;border-radius:20px;font-weight:700;font-size:14px;pointer-events:none}

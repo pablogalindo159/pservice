@@ -16,14 +16,22 @@
   };
   if (location.hash.startsWith('#gallery-')) document.getElementById(location.hash.slice(1))?.classList.add('open');
 
-  // Visualizador com navegação entre as fotos da mesma etapa
+  // Visualizador: navegação entre fotos da etapa + original em alta resolução.
+  // Usa o histórico do navegador, então o "voltar" do celular sai do original
+  // e depois fecha a foto, sem sair da página da OS.
   const viewer = $('#viewer');
   let items = [], idx = 0;
   if (viewer) {
     const mk = (cls, label, html) => { const b = document.createElement('button'); b.className = cls; b.type = 'button'; b.setAttribute('aria-label', label); b.innerHTML = html; viewer.appendChild(b); return b; };
     const prevBtn = mk('nav prev', 'Anterior', '‹'), nextBtn = mk('nav next', 'Próxima', '›');
+    const backBtn = mk('back-original', 'Voltar', '← Voltar');
     const counter = document.createElement('span'); counter.className = 'counter'; viewer.appendChild(counter);
     const img = $('img', viewer);
+    const origLink = $('[data-original-link]', viewer);
+    origLink?.removeAttribute('target');
+    const isOpen = () => viewer.classList.contains('open');
+    const inOriginal = () => viewer.classList.contains('original');
+
     const preload = (i) => { if (items[i]) new Image().src = items[i].dataset.view; };
     const show = (i) => {
       if (!items.length) return;
@@ -31,37 +39,73 @@
       const el = items[idx];
       img.src = el.dataset.view;
       $('.caption', viewer).textContent = el.dataset.caption || '';
-      $('[data-original-link]', viewer).href = el.dataset.original;
+      if (origLink) origLink.href = el.dataset.original;
       counter.textContent = items.length > 1 ? `${idx + 1} / ${items.length}` : '';
       viewer.classList.toggle('single', items.length < 2);
       preload(idx + 1); preload(idx - 1);
     };
-    const close = () => viewer.classList.remove('open');
+
+    // Estados visuais (sem mexer no histórico)
+    const setOriginal = (on) => {
+      if (!items[idx]) return;
+      viewer.classList.toggle('original', on);
+      viewer.classList.remove('zoomed');
+      if (on) {
+        viewer.classList.add('loading');
+        img.onload = img.onerror = () => viewer.classList.remove('loading');
+        img.src = items[idx].dataset.original;
+        if (origLink) origLink.hidden = true;
+      } else {
+        img.onload = img.onerror = null;
+        viewer.classList.remove('loading');
+        img.src = items[idx].dataset.view;
+        if (origLink) origLink.hidden = false;
+      }
+      viewer.scrollTo?.(0, 0);
+    };
+    const hide = () => { setOriginal(false); viewer.classList.remove('open'); };
+
+    // Ações do usuário (registram no histórico)
+    const openAt = (list, i) => { items = list; show(i); viewer.classList.add('open'); history.pushState({ pv: 'viewer' }, ''); };
+    const openOriginal = () => { setOriginal(true); history.pushState({ pv: 'original' }, ''); };
+    const goBack = () => history.back();
+    const closeAll = () => (inOriginal() ? history.go(-2) : history.back());
+
+    window.addEventListener('popstate', (e) => {
+      const st = e.state?.pv;
+      if (st === 'viewer') { if (!isOpen()) viewer.classList.add('open'); setOriginal(false); }
+      else if (st === 'original') { viewer.classList.add('open'); setOriginal(true); }
+      else if (isOpen()) hide();
+    });
+
     prevBtn.addEventListener('click', (e) => { e.stopPropagation(); show(idx - 1); });
     nextBtn.addEventListener('click', (e) => { e.stopPropagation(); show(idx + 1); });
+    backBtn.addEventListener('click', (e) => { e.stopPropagation(); goBack(); });
+    origLink?.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openOriginal(); });
+    // No original, tocar na foto alterna entre caber na tela e zoom (com rolagem)
+    img.addEventListener('click', (e) => { if (inOriginal()) { e.stopPropagation(); viewer.classList.toggle('zoomed'); } });
 
     document.addEventListener('click', (e) => {
       const g = e.target.closest('[data-gallery]');
       if (g) openGallery(g.dataset.gallery);
       const p = e.target.closest('[data-view]');
       if (p) {
-        items = [...(p.closest('.thumbs') || document).querySelectorAll('[data-view]')];
-        viewer.classList.add('open');
-        show(items.indexOf(p));
+        const list = [...(p.closest('.thumbs') || document).querySelectorAll('[data-view]')];
+        openAt(list, list.indexOf(p));
       }
-      if (e.target.closest('[data-close]') || e.target === viewer) close();
+      if (isOpen() && (e.target.closest('[data-close]') || (e.target === viewer && !inOriginal()))) closeAll();
     });
     document.addEventListener('keydown', (e) => {
-      if (!viewer.classList.contains('open')) return;
-      if (e.key === 'Escape') close();
-      if (e.key === 'ArrowLeft') show(idx - 1);
-      if (e.key === 'ArrowRight') show(idx + 1);
+      if (!isOpen()) return;
+      if (e.key === 'Escape') inOriginal() ? goBack() : closeAll();
+      if (!inOriginal() && e.key === 'ArrowLeft') show(idx - 1);
+      if (!inOriginal() && e.key === 'ArrowRight') show(idx + 1);
     });
 
-    // Deslizar o dedo: esquerda/direita troca a foto, para baixo fecha
+    // Deslizar: esquerda/direita troca a foto, para baixo fecha (desligado no original, onde o dedo move o zoom)
     let x0 = null, y0 = null;
     viewer.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1) { x0 = null; return; }   // pinça (zoom) não navega
+      if (inOriginal() || e.touches.length !== 1) { x0 = null; return; }
       x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
     }, { passive: true });
     viewer.addEventListener('touchend', (e) => {
@@ -69,7 +113,7 @@
       const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
       x0 = null;
       if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) show(idx + (dx < 0 ? 1 : -1));
-      else if (dy > 90 && Math.abs(dy) > Math.abs(dx)) close();
+      else if (dy > 90 && Math.abs(dy) > Math.abs(dx)) closeAll();
     }, { passive: true });
   } else {
     document.addEventListener('click', (e) => {
