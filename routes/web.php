@@ -4,6 +4,7 @@ use App\Http\Controllers\AuditController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ForgotPasswordController;
+use App\Http\Controllers\GeoController;
 use App\Http\Controllers\OsController;
 use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\ResetPasswordController;
@@ -24,6 +25,11 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+    Route::get('/fora-da-area', [GeoController::class, 'blocked'])->name('geo.blocked');
+    Route::post('/localizacao', [GeoController::class, 'check'])->middleware('throttle:30,1')->name('geo.check');
+    Route::get('/configuracoes', [GeoController::class, 'settings'])->name('settings.index');
+    Route::post('/configuracoes', [GeoController::class, 'saveSettings'])->name('settings.save');
 
     Route::get('/os', [OsController::class, 'index'])->name('os.index');
     Route::post('/os', [OsController::class, 'store'])->name('os.store');

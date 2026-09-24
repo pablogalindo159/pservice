@@ -154,3 +154,16 @@ form.inline select{padding:8px}form.inline .secondary{padding:8px 12px}
 .toggle-on{background:#e9f8ef;color:#17703b;border:1px solid #bfe6cd;border-radius:10px;padding:8px 12px;font-weight:700}
 @media(max-width:900px){.user-list{grid-template-columns:1fr}.uc-edit{grid-template-columns:1fr}}
 .auto-note{margin:-4px 0 12px;background:#fff8e6;border:1px solid #f5dfa6;color:#7a5200;border-radius:12px;padding:9px 12px;font-size:13px}
+/* área da empresa (GPS) */
+.geo-box{text-align:center}.geo-icon{font-size:44px;margin:6px 0}
+.geo-box h1{font-size:21px;margin:4px 0 8px}.geo-box #geoText{color:#4a5a70;margin:0 0 16px;line-height:1.5}
+.geo-help{text-align:left;margin:14px 0 6px;font-size:13px;color:#4a5a70}.geo-help summary{cursor:pointer;color:#0d5bd7;font-weight:700}
+.link-btn{background:none;border:0;color:#69778c;text-decoration:underline;margin-top:10px;font-size:14px}
+.geo-settings form{display:grid;gap:12px;margin-top:12px}
+.geo-settings label{display:grid;gap:5px;font-size:13px;font-weight:700;color:#4a5a70}
+.geo-settings input[type=number],.geo-coords input{padding:12px;border:1px solid #dce3ed;border-radius:10px;font-size:15px}
+.geo-settings label.switch{display:flex;align-items:center;gap:10px;font-size:15px;color:#172235}.geo-settings label.switch input{width:22px;height:22px}
+.geo-coords{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.geo-status{background:#eef4ff;color:#0d4fb8;border-radius:10px;padding:9px 12px;font-size:13px;margin:0}
+.muted.small{font-size:12px;margin-top:12px}
+@media(max-width:900px){.geo-coords{grid-template-columns:1fr}}

@@ -52,6 +52,8 @@ class AuditLog extends Model
             'user.updated' => 'Usuário alterado',
             'user.toggled' => 'Usuário ativado/desativado',
             'user.password_reset' => 'Senha redefinida',
+            'geo.check' => ($this->metadata['dentro_da_area'] ?? false) ? 'Localização: dentro da área' : 'Localização: fora da área',
+            'settings.geo' => 'Área da empresa alterada',
         ][$this->action] ?? $this->action).(($this->metadata['auto'] ?? false) ? ' (automático)' : '');
     }
 }

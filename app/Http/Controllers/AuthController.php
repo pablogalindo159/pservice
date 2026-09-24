@@ -36,7 +36,10 @@ class AuthController extends Controller
 
         RateLimiter::clear($key);
         $request->session()->regenerate();
-        AuditLog::record('auth.login');
+        $request->session()->forget(['geo', 'geo_logged']);
+        AuditLog::record('auth.login', null, null, \App\Support\Geo::appliesTo($user)
+            ? ['area_restrita' => true, 'obs' => 'localização verificada em seguida']
+            : []);
 
         return redirect()->intended(route('dashboard'));
     }

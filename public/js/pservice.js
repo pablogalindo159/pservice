@@ -9,6 +9,33 @@
   $('#menuBtn')?.addEventListener('click', () => toggleMenu(!sidebar.classList.contains('open')));
   backdrop?.addEventListener('click', () => toggleMenu(false));
 
+  // Área da empresa (GPS): só para perfis presos à área (body[data-geo]).
+  const geoOn = document.body.dataset.geo === '1';
+  let geoLast = 0;
+  const geoCheck = () => new Promise((resolve) => {
+    const post = (body) => fetch(document.body.dataset.geoUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+      body: JSON.stringify(body),
+    }).then((r) => r.json()).then((r) => { geoLast = Date.now(); resolve(r); }, () => resolve(null));
+    if (!navigator.geolocation) return post({ error: 'indisponivel' });
+    navigator.geolocation.getCurrentPosition(
+      (p) => post({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }),
+      (e) => post({ error: e.code === 1 ? 'negada' : e.code === 3 ? 'tempo' : 'erro' }),
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 }
+    );
+  });
+  const geoGuard = async () => {
+    if (!geoOn) return true;
+    const r = await geoCheck();
+    if (r && r.inside === false) { location.href = r.blocked_url; return false; }
+    return true;
+  };
+  if (geoOn) {
+    setInterval(geoGuard, 180000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - geoLast > 60000) geoGuard(); });
+  }
+
   // Abas de etapas: o endereço acompanha a aba (ex.: /os/1020#OS1020-entrada)
   const tabs = [...document.querySelectorAll('.stage-tab')];
   const panels = [...document.querySelectorAll('[data-panel]')];
@@ -194,6 +221,7 @@
       try { const j = JSON.parse(xhr.responseText); msg = j.message || Object.values(j.errors || {})[0]?.[0] || msg; } catch {}
       if (xhr.status === 413) msg = 'Arquivo maior que o limite do servidor.';
       if (xhr.status === 419) msg = 'Sessão expirada. Recarregue a página.';
+      if (xhr.status === 403) { try { const j = JSON.parse(xhr.responseText); if (j.blocked_url) { location.href = j.blocked_url; } } catch {} }
       reject(new Error(msg));
     };
     xhr.onerror = () => reject(new Error('Falha de conexão'));
@@ -213,6 +241,8 @@
     form.querySelectorAll('input[type=file]').forEach((input) => input.addEventListener('change', async () => {
       const files = [...input.files]; input.value = '';
       if (!files.length || !grid) return;
+      // Confirma a localização antes de enviar (perfis presos à área)
+      if (geoOn && Date.now() - geoLast > 60000 && !(await geoGuard())) return;
       const jobs = files.map((f) => {
         const el = document.createElement('div');
         const url = URL.createObjectURL(f);

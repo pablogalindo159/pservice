@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\Photo;
+use App\Models\Setting;
 use App\Models\ServiceOrder;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -206,6 +207,75 @@ class PServiceTest extends TestCase
             ->assertOk()->assertJson(['os_status' => 'em_andamento']);
 
         $this->assertTrue(AuditLog::where('service_order_id', $os->id)->where('action', 'os.status_changed')->where('metadata->auto', true)->exists());
+    }
+
+    private function areaAtiva(): void
+    {
+        Setting::put(['geo_enabled' => '1', 'geo_lat' => '-25.5347', 'geo_lng' => '-49.2064', 'geo_radius' => '150']);
+    }
+
+    public function test_area_desativada_nao_restringe(): void
+    {
+        $this->actingAs(User::factory()->role('technician')->create())->get('/os')->assertOk();
+    }
+
+    public function test_tecnico_fora_da_area_entra_mas_fica_bloqueado(): void
+    {
+        $this->areaAtiva();
+        $tec = User::factory()->role('technician')->create(['email' => 't@t.com']);
+
+        // Login funciona e fica na auditoria
+        $this->post('/login', ['email' => 't@t.com', 'password' => 'password123'])->assertRedirect();
+        $this->assertDatabaseHas('audit_logs', ['user_id' => $tec->id, 'action' => 'auth.login']);
+
+        // Sem localização confirmada: vai para a tela de verificação
+        $this->get('/os')->assertRedirect('/fora-da-area');
+        $this->get('/fora-da-area')->assertOk()->assertSee('Verificando sua localização');
+
+        // Em Curitiba (~13 km): fora
+        $this->postJson('/localizacao', ['lat' => -25.4284, 'lng' => -49.2733, 'acc' => 20])
+            ->assertOk()->assertJson(['inside' => false]);
+        $this->get('/os')->assertRedirect('/fora-da-area');
+        $this->get('/dashboard')->assertRedirect('/fora-da-area');
+        $os = ServiceOrder::create(['number' => '1', 'client_name' => 'C']);
+        $this->postJson("/os/{$os->number}/photos", ['stage' => 'Entrada'])->assertStatus(403);
+        $this->assertTrue(AuditLog::where('user_id', $tec->id)->where('action', 'geo.check')->exists());
+
+        // Dentro da empresa (~100 m): liberado
+        $this->postJson('/localizacao', ['lat' => -25.5338, 'lng' => -49.2064, 'acc' => 15])
+            ->assertOk()->assertJson(['inside' => true]);
+        $this->get('/os')->assertOk();
+
+        // Localização negada: bloqueado
+        $this->postJson('/localizacao', ['error' => 'negada'])->assertJson(['inside' => false]);
+        $this->get('/os')->assertRedirect('/fora-da-area');
+    }
+
+    public function test_admin_e_gerente_nao_sao_restritos(): void
+    {
+        $this->areaAtiva();
+        $this->actingAs(User::factory()->role('admin')->create())->get('/os')->assertOk();
+        $this->actingAs(User::factory()->role('manager')->create())->get('/os')->assertOk();
+    }
+
+    public function test_verificacao_expira(): void
+    {
+        $this->areaAtiva();
+        $this->actingAs(User::factory()->role('laboratory')->create());
+        $this->postJson('/localizacao', ['lat' => -25.5347, 'lng' => -49.2064, 'acc' => 10])->assertJson(['inside' => true]);
+        $this->get('/os')->assertOk();
+        $this->travel(11)->minutes();
+        $this->get('/os')->assertRedirect('/fora-da-area');
+    }
+
+    public function test_so_admin_configura_area(): void
+    {
+        $this->actingAs(User::factory()->role('manager')->create())->get('/configuracoes')->assertForbidden();
+        $this->actingAs(User::factory()->role('admin')->create())
+            ->post('/configuracoes', ['enabled' => '1', 'lat' => '-25.5347', 'lng' => '-49.2064', 'radius' => 150])
+            ->assertRedirect();
+        $this->assertSame('1', Setting::get('geo_enabled'));
+        $this->assertTrue(AuditLog::where('action', 'settings.geo')->exists());
     }
 
     public function test_foto_exige_login(): void
