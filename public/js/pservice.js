@@ -54,28 +54,36 @@
         viewer.classList.add('loading');
         img.onload = img.onerror = () => viewer.classList.remove('loading');
         img.src = items[idx].dataset.original;
-        if (origLink) origLink.hidden = true;
+        if (origLink) origLink.style.display = 'none';
       } else {
         img.onload = img.onerror = null;
         viewer.classList.remove('loading');
         img.src = items[idx].dataset.view;
-        if (origLink) origLink.hidden = false;
+        if (origLink) origLink.style.display = '';
       }
       viewer.scrollTo?.(0, 0);
     };
     const hide = () => { setOriginal(false); viewer.classList.remove('open'); };
 
-    // Ações do usuário (registram no histórico)
-    const openAt = (list, i) => { items = list; show(i); viewer.classList.add('open'); history.pushState({ pv: 'viewer' }, ''); };
-    const openOriginal = () => { setOriginal(true); history.pushState({ pv: 'original' }, ''); };
-    const goBack = () => history.back();
-    const closeAll = () => (inOriginal() ? history.go(-2) : history.back());
+    // Ações do usuário. A tela muda na hora (não depende do navegador);
+    // o histórico só acompanha, para o gesto "voltar" do celular funcionar também.
+    let depth = 0; // quantas entradas nossas estão no histórico (0, 1 = foto, 2 = original)
+    const openAt = (list, i) => { items = list; show(i); viewer.classList.add('open'); history.pushState({ pv: 'viewer' }, ''); depth = 1; };
+    const openOriginal = () => { setOriginal(true); history.pushState({ pv: 'original' }, ''); depth = 2; };
+    const goBack = () => { // sai do original, continua na foto
+      setOriginal(false);
+      if (depth === 2) { depth = 1; history.back(); }
+    };
+    const closeAll = () => { // fecha a foto de qualquer estado
+      const n = depth; depth = 0; hide();
+      if (n > 0) history.go(-n);
+    };
 
     window.addEventListener('popstate', (e) => {
       const st = e.state?.pv;
-      if (st === 'viewer') { if (!isOpen()) viewer.classList.add('open'); setOriginal(false); }
-      else if (st === 'original') { viewer.classList.add('open'); setOriginal(true); }
-      else if (isOpen()) hide();
+      if (st === 'viewer') { depth = 1; if (!isOpen()) viewer.classList.add('open'); if (inOriginal()) setOriginal(false); }
+      else if (st === 'original') { depth = 2; viewer.classList.add('open'); if (!inOriginal()) setOriginal(true); }
+      else { depth = 0; if (isOpen()) hide(); }
     });
 
     prevBtn.addEventListener('click', (e) => { e.stopPropagation(); show(idx - 1); });
