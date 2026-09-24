@@ -14,12 +14,13 @@
 @foreach($stages as $stage)
 @php($items = $photos[$stage] ?? collect())
 @php($cover = $items->first())
+@php($anchor = $os->stageAnchor($stage))
 <article class="stage" id="stage-{{ $loop->index }}">
-<div class="cover" data-gallery="gallery-{{ $loop->index }}">@if($cover)<img loading="lazy" src="{{ route('photos.file', [$cover, 'size' => 'thumb']) }}" alt="{{ $stage }}">@else<div class="stage-icon">📷</div>@endif</div>
+<div class="cover" data-gallery="{{ $anchor }}">@if($cover)<img loading="lazy" src="{{ route('photos.file', [$cover, 'size' => 'thumb']) }}" alt="{{ $stage }}">@else<div class="stage-icon">📷</div>@endif</div>
 <div class="stage-body"><div class="stage-title">{{ $loop->iteration }}. {{ $stage }}</div><div class="count">{{ $items->count() }} foto(s)</div>
-<div class="actions"><button type="button" data-gallery="gallery-{{ $loop->index }}" class="primary">Abrir etapa</button>
+<div class="actions"><button type="button" data-gallery="{{ $anchor }}" class="primary">Abrir etapa</button>
 @if($me->canDownload() && $items->isNotEmpty())<a class="secondary" href="{{ route('photos.downloadStage', $os) }}?stage={{ urlencode($stage) }}">Baixar</a>@endif</div></div>
-<div class="gallery" id="gallery-{{ $loop->index }}">
+<div class="gallery" id="{{ $anchor }}">
 @if($me->canTakePhotos())
 <form class="upload" method="post" enctype="multipart/form-data" action="{{ route('photos.store', $os) }}" data-upload>
 @csrf<input type="hidden" name="stage" value="{{ $stage }}">

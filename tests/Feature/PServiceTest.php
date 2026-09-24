@@ -56,7 +56,7 @@ class PServiceTest extends TestCase
         $user = User::factory()->role('technician')->create();
         $os = ServiceOrder::create(['number' => '1020', 'client_name' => 'C']);
 
-        $this->actingAs($user)->postJson("/os/{$os->id}/photos", [
+        $this->actingAs($user)->postJson("/os/{$os->number}/photos", [
             'stage' => 'Entrada',
             'photos' => [UploadedFile::fake()->image('a.jpg', 2400, 1800)],
         ])->assertOk()->assertJson(['ok' => true]);
@@ -74,10 +74,10 @@ class PServiceTest extends TestCase
         $file = UploadedFile::fake()->image('a.jpg');
 
         $this->actingAs(User::factory()->role('viewer')->create())
-            ->post("/os/{$os->id}/photos", ['stage' => 'Entrada', 'photos' => [$file]])->assertForbidden();
+            ->post("/os/{$os->number}/photos", ['stage' => 'Entrada', 'photos' => [$file]])->assertForbidden();
 
         $this->actingAs(User::factory()->role('technician')->create())
-            ->postJson("/os/{$os->id}/photos", ['stage' => 'Pintura', 'photos' => [$file]])->assertStatus(422);
+            ->postJson("/os/{$os->number}/photos", ['stage' => 'Pintura', 'photos' => [$file]])->assertStatus(422);
     }
 
     public function test_exclusao_mantem_original_e_registra(): void
@@ -85,7 +85,7 @@ class PServiceTest extends TestCase
         Storage::fake('local');
         $manager = User::factory()->role('manager')->create();
         $os = ServiceOrder::create(['number' => '7', 'client_name' => 'C']);
-        $this->actingAs($manager)->postJson("/os/{$os->id}/photos", ['stage' => 'Testes', 'photos' => [UploadedFile::fake()->image('t.jpg')]]);
+        $this->actingAs($manager)->postJson("/os/{$os->number}/photos", ['stage' => 'Testes', 'photos' => [UploadedFile::fake()->image('t.jpg')]]);
         $photo = Photo::firstOrFail();
 
         $this->delete("/photos/{$photo->id}")->assertRedirect();
@@ -93,6 +93,17 @@ class PServiceTest extends TestCase
         $this->assertSoftDeleted($photo);
         Storage::disk('local')->assertExists($photo->original_path);
         $this->assertTrue(AuditLog::where('action', 'photo.deleted')->where('photo_id', $photo->id)->exists());
+    }
+
+    public function test_url_da_os_usa_o_numero_e_link_antigo_redireciona(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $os = ServiceOrder::create(['number' => '1020', 'client_name' => 'C']);
+
+        $this->get('/os/1020')->assertOk()->assertSee('id="OS1020-entrada"', false);
+        $this->get("/os/{$os->id}")->assertRedirect('/os/1020');
+        $this->get('/os/OS1020')->assertRedirect('/os/1020');
+        $this->get('/os/9999')->assertNotFound();
     }
 
     public function test_foto_exige_login(): void

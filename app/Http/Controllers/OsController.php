@@ -49,8 +49,13 @@ class OsController extends Controller
         return redirect()->route('os.show', $order)->with('ok', 'OS criada.');
     }
 
-    public function show(ServiceOrder $os)
+    public function show(Request $request, ServiceOrder $os)
     {
+        // Link antigo (/os/{id}) ou com prefixo (/os/OS1020): redireciona para /os/{número}
+        if ((string) $request->route()->originalParameter('os') !== (string) $os->number) {
+            return redirect()->route('os.show', $os);
+        }
+
         $stages = Stages::all();
         // Mais antiga primeiro: a primeira foto da etapa é a capa.
         $photos = $os->photos()->with('user')->orderBy('captured_at')->orderBy('id')->get()->groupBy('stage');

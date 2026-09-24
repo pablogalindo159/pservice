@@ -8,13 +8,16 @@
   $('#menuBtn')?.addEventListener('click', () => toggleMenu(!sidebar.classList.contains('open')));
   backdrop?.addEventListener('click', () => toggleMenu(false));
 
-  // Galerias
+  // Galerias: o endereço acompanha a etapa aberta (ex.: /os/1020#OS1020-entrada)
   const openGallery = (id) => {
     const g = document.getElementById(id); if (!g) return;
     g.classList.toggle('open');
-    if (g.classList.contains('open')) history.replaceState(null, '', '#' + id);
+    history.replaceState(history.state, '', g.classList.contains('open') ? '#' + id : location.pathname + location.search);
   };
-  if (location.hash.startsWith('#gallery-')) document.getElementById(location.hash.slice(1))?.classList.add('open');
+  if (location.hash.length > 1) {
+    const g = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    if (g?.classList.contains('gallery')) { g.classList.add('open'); g.closest('.stage')?.scrollIntoView(); }
+  }
 
   // Visualizador: navegação entre fotos da etapa + original em alta resolução.
   // Usa o histórico do navegador, então o "voltar" do celular sai do original

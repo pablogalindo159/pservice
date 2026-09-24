@@ -1,7 +1,7 @@
 // Service worker mínimo: torna o app instalável e mantém arquivos estáticos em cache.
 // Páginas e fotos NÃO são cacheadas (dados sempre atualizados e protegidos por login).
-const CACHE = 'pservice-static-v5';
-const ASSETS = ['/css/pservice.css?v=4', '/js/pservice.js?v=5', '/assets/logo.jpeg', '/icons/icon-192.png', '/offline.html'];
+const CACHE = 'pservice-static-v6';
+const ASSETS = ['/css/pservice.css?v=4', '/js/pservice.js?v=6', '/assets/logo.jpeg', '/icons/icon-192.png', '/offline.html'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
