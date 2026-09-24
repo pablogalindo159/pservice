@@ -2,7 +2,7 @@
 
 Registro fotográfico de Ordens de Serviço, por etapas (Entrada → Desmontagem → Bobinagem → Montagem → Testes → Finalização). Aplicação web responsiva + PWA, pensada para o técnico fotografar pelo celular e o gestor acompanhar pelo computador.
 
-**Stack:** Laravel 13 · PHP 8.3 · SQLite (ou MySQL) · Intervention Image · Nginx + PHP-FPM
+**Stack:** Laravel 13 · PHP 8.3 · SQLite (ou MySQL) · componente Image nativo (Intervention v4) · Nginx + PHP-FPM
 
 ## Funcionalidades
 

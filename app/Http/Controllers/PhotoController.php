@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Intervention\Image\Laravel\Facades\Image;
+use Illuminate\Support\Facades\Image;
 
 class PhotoController extends Controller
 {
@@ -71,13 +71,18 @@ class PhotoController extends Controller
 
         $disk->putFileAs(dirname($original), $file, basename($original));
 
-        // Uma leitura só: preview (1600px) e depois miniatura quadrada (480px).
-        $image = Image::read($file->getRealPath());
-        $image->scaleDown(width: config('pservice.upload.preview_width'));
-        $disk->put($preview, (string) $image->toJpeg(82));
+        // Componente de imagem nativo do Laravel 13 (Intervention v4 por baixo).
+        // Preview a partir do original; miniatura a partir do preview (bem mais leve).
+        $previewBytes = Image::fromPath($file->getRealPath())
+            ->orient()
+            ->scale(width: config('pservice.upload.preview_width'))
+            ->toJpeg()->quality(82)
+            ->toBytes();
+        $disk->put($preview, $previewBytes);
+
         $size = config('pservice.upload.thumb_width');
-        $image->cover($size, $size);
-        $disk->put($thumb, (string) $image->toJpeg(78));
+        $disk->put($thumb, Image::fromBytes($previewBytes)->cover($size, $size)->toJpeg()->quality(78)->toBytes());
+        unset($previewBytes);
 
         return DB::transaction(function () use ($request, $os, $stage, $original, $preview, $thumb, $file, $now, $filename) {
             $photo = Photo::create([

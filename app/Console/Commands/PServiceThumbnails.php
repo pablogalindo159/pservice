@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Photo;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
-use Intervention\Image\Laravel\Facades\Image;
+use Illuminate\Support\Facades\Image;
 
 class PServiceThumbnails extends Command
 {
@@ -31,12 +31,14 @@ class PServiceThumbnails extends Command
                     continue;
                 }
 
-                $image = Image::read($disk->path($photo->original_path));
-                $image->scaleDown(width: config('pservice.upload.preview_width'));
-                $disk->put($preview, (string) $image->toJpeg(82));
+                $previewBytes = Image::fromPath($disk->path($photo->original_path))
+                    ->orient()
+                    ->scale(width: config('pservice.upload.preview_width'))
+                    ->toJpeg()->quality(82)
+                    ->toBytes();
+                $disk->put($preview, $previewBytes);
                 $size = config('pservice.upload.thumb_width');
-                $image->cover($size, $size);
-                $disk->put($thumb, (string) $image->toJpeg(78));
+                $disk->put($thumb, Image::fromBytes($previewBytes)->cover($size, $size)->toJpeg()->quality(78)->toBytes());
 
                 if ($photo->thumbnail_path && $photo->thumbnail_path !== $thumb) {
                     $disk->delete($photo->thumbnail_path);
