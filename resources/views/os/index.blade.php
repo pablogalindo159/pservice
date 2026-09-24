@@ -5,7 +5,7 @@
 <input name="q" value="{{ $q }}" placeholder="🔎  Buscar OS ou cliente..." inputmode="search">
 <select name="status" onchange="this.form.submit()"><option value="">Todos os status</option>@foreach(config('pservice.statuses') as $k => $label)<option value="{{ $k }}" @selected($status === $k)>{{ $label }}</option>@endforeach</select>
 <button class="primary">Buscar</button></form></div>
-@if(auth()->user()->canCreateOs())
+@if(auth()->user()->canCreateOs() && ! \App\Support\Geo::hidesPhotos(auth()->user()))
 <details class="panel new-os" @if($errors->has('number') || $errors->has('client_name')) open @endif><summary>＋ Nova OS</summary>
 <form method="post" action="{{ route('os.store') }}">@csrf<input name="number" value="{{ old('number') }}" placeholder="Número da OS" required maxlength="50" autocapitalize="characters"><input name="client_name" value="{{ old('client_name') }}" placeholder="Nome do cliente" required><button class="primary">Criar OS</button></form></details>
 @endif

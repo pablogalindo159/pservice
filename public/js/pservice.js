@@ -28,7 +28,13 @@
   const geoGuard = async () => {
     if (!geoOn) return true;
     const r = await geoCheck();
-    if (r && r.inside === false) { location.href = r.blocked_url; return false; }
+    if (!r) return true;
+    if (r.mode === 'photos') {
+      // Entrou ou saiu da área: recarrega para mostrar/ocultar as fotos
+      if ((r.inside ? '1' : '0') !== document.body.dataset.geoInside) location.reload();
+      return true;
+    }
+    if (r.inside === false) { location.href = r.blocked_url; return false; }
     return true;
   };
   if (geoOn) {
@@ -62,7 +68,7 @@
   const refreshCounts = () => {
     let done = 0;
     panels.forEach((p) => {
-      const n = p.querySelectorAll('.photo[data-view]').length;
+      const n = p.querySelectorAll('.photo:not(.uploading):not(.failed)').length;
       const t = tabs.find((x) => x.dataset.tab === p.id);
       if (t) { const b = $('.n', t); b.textContent = n; b.hidden = !n; $('.ok', t).hidden = !n; }
       const c = $('[data-count]', p); if (c) c.textContent = n;
@@ -230,6 +236,11 @@
 
   const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fillPhoto = (el, v) => {
+    if (v.locked) { // fora da área: foto salva, mas sem visualização
+      el.className = 'photo locked';
+      el.innerHTML = `<span class="lock">🔒</span><span class="lb">${esc(v.label)}</span>`;
+      return;
+    }
     el.className = 'photo';
     el.dataset.view = v.view; el.dataset.original = v.original; el.dataset.caption = v.caption;
     if (v.delete) el.dataset.delete = v.delete;

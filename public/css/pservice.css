@@ -167,3 +167,20 @@ form.inline select{padding:8px}form.inline .secondary{padding:8px 12px}
 .geo-status{background:#eef4ff;color:#0d4fb8;border-radius:10px;padding:9px 12px;font-size:13px;margin:0}
 .muted.small{font-size:12px;margin-top:12px}
 @media(max-width:900px){.geo-coords{grid-template-columns:1fr}}
+/* alertas e fotos ocultas */
+.menu-badge{font-style:normal;background:#d93025;color:#fff;border-radius:999px;font-size:11px;font-weight:800;padding:1px 7px;margin-left:auto}
+.sidebar nav a{display:flex;align-items:center;gap:6px}
+#menuBtn{position:relative}.menu-dot{position:absolute;top:6px;right:6px;width:10px;height:10px;border-radius:50%;background:#ff5a4f;border:2px solid #17345d}
+.geo-banner{background:#fff4dd;border:1px solid #f5d38f;color:#7a5200;border-radius:12px;padding:10px 12px;margin-bottom:14px;font-size:14px;font-weight:600}
+.alert-card{display:flex;align-items:center;gap:8px;background:#fdecea;border:1px solid #f5c2bd;color:#8a1c12;border-radius:14px;padding:12px 14px;margin-bottom:16px;text-decoration:none}.alert-card span{margin-left:auto;font-weight:700}
+.alert-list{display:grid;gap:10px}
+.alert-item{display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid #e6ebf2;border-radius:14px;padding:12px 14px}
+.alert-item.new{border-color:#f5c2bd;background:#fffafa}
+.alert-ico{font-size:22px;line-height:1}.alert-body{flex:1;display:grid;gap:4px}.alert-body small{color:#69778c}.alert-body a{color:#0d5bd7;text-decoration:none;font-weight:600}
+.alert-dot{width:10px;height:10px;border-radius:50%;background:#d93025;margin-top:6px}
+.photo.locked{display:flex;align-items:center;justify-content:center;background:#eef1f5;cursor:default}.photo.locked .lock{font-size:22px;opacity:.6}
+.locked-note{background:#f4f6fa;border-radius:10px;padding:9px 12px;color:#4a5a70;font-size:13px;margin:0 0 10px}
+.geo-mode{border:1px solid #e6ebf2;border-radius:12px;padding:10px 12px;display:grid;gap:8px}.geo-mode legend{font-weight:800;font-size:13px;color:#4a5a70;padding:0 4px}
+.geo-mode .opt{display:flex!important;gap:10px;align-items:flex-start;font-weight:400!important;color:#172235!important;font-size:14px!important}
+.geo-mode .opt small{display:block;color:#69778c;font-size:12px;margin-top:2px}.geo-mode .opt input{margin-top:3px}
+.geo-continue{display:block;text-align:center;text-decoration:none;margin-bottom:8px}

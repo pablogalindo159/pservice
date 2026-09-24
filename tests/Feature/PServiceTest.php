@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Alert;
 use App\Models\AuditLog;
 use App\Models\Photo;
 use App\Models\Setting;
@@ -209,9 +210,9 @@ class PServiceTest extends TestCase
         $this->assertTrue(AuditLog::where('service_order_id', $os->id)->where('action', 'os.status_changed')->where('metadata->auto', true)->exists());
     }
 
-    private function areaAtiva(): void
+    private function areaAtiva(string $mode = 'photos'): void
     {
-        Setting::put(['geo_enabled' => '1', 'geo_lat' => '-25.5347', 'geo_lng' => '-49.2064', 'geo_radius' => '150']);
+        Setting::put(['geo_enabled' => '1', 'geo_lat' => '-25.5347', 'geo_lng' => '-49.2064', 'geo_radius' => '150', 'geo_mode' => $mode]);
     }
 
     public function test_area_desativada_nao_restringe(): void
@@ -221,7 +222,7 @@ class PServiceTest extends TestCase
 
     public function test_tecnico_fora_da_area_entra_mas_fica_bloqueado(): void
     {
-        $this->areaAtiva();
+        $this->areaAtiva('block');
         $tec = User::factory()->role('technician')->create(['email' => 't@t.com']);
 
         // Login funciona e fica na auditoria
@@ -251,6 +252,56 @@ class PServiceTest extends TestCase
         $this->get('/os')->assertRedirect('/fora-da-area');
     }
 
+    public function test_modo_fotos_fora_da_area_envia_mas_nao_ve(): void
+    {
+        Storage::fake('local');
+        $this->areaAtiva('photos');
+        $tec = User::factory()->role('technician')->create(['name' => 'João']);
+        $this->actingAs($tec);
+        $os = ServiceOrder::create(['number' => '221', 'client_name' => 'C']);
+        $foto = $this->fotoEm($os, 'Entrada');
+
+        // Fora da área (Curitiba)
+        $this->postJson('/localizacao', ['lat' => -25.4284, 'lng' => -49.2733, 'acc' => 20])
+            ->assertJson(['inside' => false, 'mode' => 'photos']);
+        $this->assertSame(1, Alert::where('type', 'geo.outside')->where('user_id', $tec->id)->count());
+
+        // Navega e vê a OS, mas sem as fotos
+        $this->get('/os')->assertOk()->assertSee('Fora da área da empresa');
+        $this->get('/os/221')->assertOk()->assertSee('photo locked', false)->assertDontSee('data-view=', false);
+        $this->get("/photos/{$foto->id}/file?size=thumb")->assertForbidden();
+        $this->get('/os/221/photos/download-all')->assertRedirect('/os');
+        $this->patch('/os/221/status', ['status' => 'finalizada'])->assertRedirect('/os');
+        $this->post('/os', ['number' => '9', 'client_name' => 'X'])->assertRedirect('/os');
+
+        // Envia fotos normalmente: recebe só o "cadeado" e gera alerta agrupado
+        for ($i = 0; $i < 2; $i++) {
+            $this->postJson('/os/221/photos', ['stage' => 'Testes', 'photos' => [UploadedFile::fake()->image("t{$i}.jpg")]])
+                ->assertOk()->assertJsonPath('photos.0.locked', true)->assertJsonMissingPath('photos.0.view');
+        }
+        $alert = Alert::where('type', 'photo.outside')->firstOrFail();
+        $this->assertSame(2, $alert->meta['count']);
+        $this->assertStringContainsString('enviou 2 foto(s) fora da área na OS221', $alert->message);
+
+        // Voltou para a área: vê tudo
+        $this->postJson('/localizacao', ['lat' => -25.5347, 'lng' => -49.2064, 'acc' => 10])->assertJson(['inside' => true]);
+        $this->get('/os/221')->assertSee('data-view=', false);
+        $this->get("/photos/{$foto->id}/file?size=thumb")->assertStatus(404); // passa pela trava (arquivo falso não existe)
+    }
+
+    public function test_alertas_so_para_admin_e_gerente(): void
+    {
+        Alert::create(['type' => 'geo.outside', 'message' => 'Teste fora da área']);
+        $this->actingAs(User::factory()->role('technician')->create())->get('/alertas')->assertForbidden();
+
+        $ger = User::factory()->role('manager')->create();
+        $this->actingAs($ger)->get('/dashboard')->assertSee('1 alerta(s) novo(s)');
+        $this->get('/alertas')->assertOk()->assertSee('Teste fora da área');
+        $this->post('/alertas/vistos')->assertRedirect();
+        $this->assertSame(0, Alert::unseenCount());
+        $this->assertSame($ger->id, Alert::first()->seen_by);
+    }
+
     public function test_admin_e_gerente_nao_sao_restritos(): void
     {
         $this->areaAtiva();
@@ -272,7 +323,7 @@ class PServiceTest extends TestCase
     {
         $this->actingAs(User::factory()->role('manager')->create())->get('/configuracoes')->assertForbidden();
         $this->actingAs(User::factory()->role('admin')->create())
-            ->post('/configuracoes', ['enabled' => '1', 'lat' => '-25.5347', 'lng' => '-49.2064', 'radius' => 150])
+            ->post('/configuracoes', ['enabled' => '1', 'lat' => '-25.5347', 'lng' => '-49.2064', 'radius' => 150, 'mode' => 'photos'])
             ->assertRedirect();
         $this->assertSame('1', Setting::get('geo_enabled'));
         $this->assertTrue(AuditLog::where('action', 'settings.geo')->exists());

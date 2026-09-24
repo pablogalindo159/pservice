@@ -3,7 +3,8 @@
 @section('content')
 @php
     $me = auth()->user();
-    $canDelete = $me->canDeletePhotos();
+    $hidePhotos = \App\Support\Geo::hidesPhotos($me);
+    $canDelete = $me->canDeletePhotos() && ! $hidePhotos;
     $done = collect($stages)->filter(fn ($s) => ($photos[$s] ?? collect())->isNotEmpty())->count();
     $autoHours = config('pservice.auto_finalize_hours');
     $autoNote = $autoHours > 0 && in_array($os->status, ['aberta', 'em_andamento'], true) && ($photos[last($stages)] ?? collect())->isNotEmpty();
@@ -14,7 +15,7 @@
         <h1>OS{{ $os->number }}</h1>
         <p>{{ $os->client_name }} · aberta em {{ $os->created_at->format('d/m/Y') }}</p>
     </div>
-    @if($me->canCreateOs())
+    @if($me->canCreateOs() && ! $hidePhotos)
     <form method="post" action="{{ route('os.status', $os) }}">@csrf @method('PATCH')
         <select name="status" class="status-pill st-{{ $os->status }}" onchange="this.form.submit()" aria-label="Status da OS">
             @foreach(config('pservice.statuses') as $k => $label)<option value="{{ $k }}" @selected($os->status === $k)>{{ $label }}</option>@endforeach
@@ -53,21 +54,26 @@
         <noscript><button class="primary">Salvar fotos</button></noscript>
     </form>
     @endif
+    @if($hidePhotos && $items->isNotEmpty())<p class="locked-note">🔒 Fora da área da empresa as fotos ficam ocultas. Você pode enviar normalmente.</p>@endif
     <div class="thumbs photo-grid">
     @foreach($items as $photo)
         @php $v = $photo->toViewerArray($canDelete); @endphp
+        @if($hidePhotos)
+        <div class="photo locked"><span class="lock">🔒</span><span class="lb">{{ $v['label'] }}</span></div>
+        @else
         <div class="photo" data-view="{{ $v['view'] }}" data-original="{{ $v['original'] }}" data-caption="{{ $v['caption'] }}" @if($v['delete']) data-delete="{{ $v['delete'] }}" @endif><img loading="lazy" src="{{ $v['thumb'] }}" alt=""><span class="lb">{{ $v['label'] }}</span></div>
+        @endif
     @endforeach
     </div>
     <p class="empty" @if($items->isNotEmpty()) hidden @endif>Nenhuma foto nesta etapa</p>
     <div class="panel-foot">
         <span class="cnt"><b data-count>{{ $items->count() }}</b> foto(s) · {{ $stage }}</span>
-        @if($me->canDownload())<a class="secondary sm" data-dl href="{{ route('photos.downloadStage', $os) }}?stage={{ urlencode($stage) }}" @if($items->isEmpty()) hidden @endif>⬇ Baixar etapa</a>@endif
+        @if($me->canDownload() && ! $hidePhotos)<a class="secondary sm" data-dl href="{{ route('photos.downloadStage', $os) }}?stage={{ urlencode($stage) }}" @if($items->isEmpty()) hidden @endif>⬇ Baixar etapa</a>@endif
     </div>
 </section>
 @endforeach
 
-@if($me->canDownload() && $photos->isNotEmpty())
+@if($me->canDownload() && ! $hidePhotos && $photos->isNotEmpty())
 <div class="all-download"><a href="{{ route('photos.downloadAll', $os) }}">⬇ Baixar todas as fotos da OS (ZIP)</a></div>
 @endif
 

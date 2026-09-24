@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Photo;
 use App\Models\ServiceOrder;
+use App\Support\Alerts;
+use App\Support\Geo;
 use App\Support\Stages;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -29,15 +31,22 @@ class PhotoController extends Controller
             'photos.required' => 'Nenhuma foto recebida. Se enviou muitas fotos de uma vez, o limite do servidor pode ter sido excedido.',
         ]);
 
+        $outside = Geo::hidesPhotos($request->user());
         $saved = [];
         foreach ($request->file('photos', []) as $file) {
-            $saved[] = $this->storeOne($request, $os, $data['stage'], $file);
+            $saved[] = $this->storeOne($request, $os, $data['stage'], $file, $outside);
+            if ($outside) {
+                Alerts::photoOutside($request->user(), $os);
+            }
         }
 
         if ($request->expectsJson()) {
             return response()->json([
                 'ok' => true,
-                'photos' => collect($saved)->map(fn (Photo $p) => $p->toViewerArray($request->user()->canDeletePhotos())),
+                // Fora da área a foto é salva, mas quem enviou não recebe os links para vê-la.
+                'photos' => collect($saved)->map(fn (Photo $p) => $outside
+                    ? ['id' => $p->id, 'locked' => true, 'label' => $p->toViewerArray()['label']]
+                    : $p->toViewerArray($request->user()->canDeletePhotos())),
                 'os_status' => $os->status,
                 'os_status_label' => $os->status_label,
             ]);
@@ -46,7 +55,7 @@ class PhotoController extends Controller
         return back()->with('ok', count($saved).' foto(s) salva(s).');
     }
 
-    private function storeOne(Request $request, ServiceOrder $os, string $stage, UploadedFile $file): Photo
+    private function storeOne(Request $request, ServiceOrder $os, string $stage, UploadedFile $file, bool $outside = false): Photo
     {
         $disk = Storage::disk('local');
         $now = now();
@@ -82,7 +91,7 @@ class PhotoController extends Controller
         $disk->put($thumb, Image::fromBytes($previewBytes)->cover($size, $size)->toJpeg()->quality(78)->toBytes());
         unset($previewBytes);
 
-        return DB::transaction(function () use ($request, $os, $stage, $original, $preview, $thumb, $file, $now, $filename) {
+        return DB::transaction(function () use ($request, $os, $stage, $original, $preview, $thumb, $file, $now, $filename, $outside) {
             $photo = Photo::create([
                 'service_order_id' => $os->id,
                 'user_id' => $request->user()->id,
@@ -103,7 +112,9 @@ class PhotoController extends Controller
                 ]);
             }
 
-            AuditLog::record('photo.added', $os->id, $photo->id, ['stage' => $stage, 'filename' => $filename]);
+            AuditLog::record('photo.added', $os->id, $photo->id, array_filter([
+                'stage' => $stage, 'filename' => $filename, 'fora_da_area' => $outside ?: null,
+            ]));
 
             return $photo;
         });

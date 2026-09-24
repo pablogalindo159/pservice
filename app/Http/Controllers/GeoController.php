@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Setting;
+use App\Support\Alerts;
 use App\Support\Geo;
 use Illuminate\Http\Request;
 
@@ -16,7 +17,7 @@ class GeoController extends Controller
             return redirect()->route('dashboard');
         }
 
-        return view('geo.blocked', ['geo' => session('geo'), 'radius' => Geo::radius()]);
+        return view('geo.blocked', ['geo' => session('geo'), 'radius' => Geo::radius(), 'mode' => Geo::mode()]);
     }
 
     /** Recebe a localização do aparelho e atualiza a sessão. */
@@ -45,6 +46,9 @@ class GeoController extends Controller
 
         // Registra a primeira verificação após o login e toda mudança dentro/fora (sem poluir a cada 3 min).
         if (! session('geo_logged') || ($prev['inside'] ?? null) !== $g['inside']) {
+            if (! $g['inside']) {
+                Alerts::outside($user, $g);
+            }
             AuditLog::record('geo.check', null, null, array_filter([
                 'dentro_da_area' => $g['inside'],
                 'distancia' => Geo::formatDistance($g['distance']),
@@ -59,7 +63,8 @@ class GeoController extends Controller
             'inside' => $g['inside'],
             'distance' => Geo::formatDistance($g['distance']),
             'reason' => $g['reason'],
-            'redirect' => $g['inside'] ? session()->pull('url.intended', route('dashboard')) : null,
+            'mode' => Geo::mode(),
+            'redirect' => ($g['inside'] || Geo::mode() === 'photos') ? session()->pull('url.intended', route('dashboard')) : null,
             'blocked_url' => route('geo.blocked'),
         ]);
     }
@@ -73,6 +78,7 @@ class GeoController extends Controller
             'lat' => Setting::get('geo_lat'),
             'lng' => Setting::get('geo_lng'),
             'radius' => Geo::radius(),
+            'mode' => Geo::mode(),
         ]);
     }
 
@@ -85,20 +91,22 @@ class GeoController extends Controller
             'lat' => 'required_if:enabled,1|nullable|numeric|between:-90,90',
             'lng' => 'required_if:enabled,1|nullable|numeric|between:-180,180',
             'radius' => 'required|integer|min:50|max:5000',
+            'mode' => 'required|in:photos,block',
         ], [
             'lat.required_if' => 'Defina a localização da empresa antes de ativar.',
             'lng.required_if' => 'Defina a localização da empresa antes de ativar.',
         ]);
 
-        $old = ['enabled' => Setting::get('geo_enabled'), 'lat' => Setting::get('geo_lat'), 'lng' => Setting::get('geo_lng'), 'radius' => Setting::get('geo_radius')];
+        $old = ['enabled' => Setting::get('geo_enabled'), 'lat' => Setting::get('geo_lat'), 'lng' => Setting::get('geo_lng'), 'radius' => Setting::get('geo_radius'), 'mode' => Geo::mode()];
         Setting::put([
+            'geo_mode' => $data['mode'],
             'geo_enabled' => ! empty($data['enabled']) ? '1' : '0',
             'geo_lat' => $data['lat'] ?? null,
             'geo_lng' => $data['lng'] ?? null,
             'geo_radius' => $data['radius'],
         ]);
         AuditLog::record('settings.geo', null, null, ['antes' => $old, 'depois' => [
-            'enabled' => ! empty($data['enabled']) ? '1' : '0', 'lat' => $data['lat'] ?? null, 'lng' => $data['lng'] ?? null, 'radius' => $data['radius'],
+            'enabled' => ! empty($data['enabled']) ? '1' : '0', 'lat' => $data['lat'] ?? null, 'lng' => $data['lng'] ?? null, 'radius' => $data['radius'], 'mode' => $data['mode'],
         ]]);
 
         return back()->with('ok', 'Área da empresa salva.');

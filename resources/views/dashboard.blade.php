@@ -1,5 +1,6 @@
 @extends('layouts.app')
 @section('content')
+@if(auth()->user()->canAudit() && ($novos = \App\Models\Alert::unseenCount()))<a class="alert-card" href="{{ route('alerts.index') }}">🔔 <b>{{ $novos }} alerta(s) novo(s)</b> de acesso fora da área <span>Ver →</span></a>@endif
 <div class="page-head"><div><span class="eyebrow">PAINEL</span><h1>Visão geral</h1><p>Acompanhe suas ordens de serviço e registros fotográficos.</p></div>
 <a class="primary" href="{{ route('os.index') }}">Ver ordens</a></div>
 <div class="metrics">
@@ -20,11 +21,13 @@
 <div class="barrow"><span>{{ $stage }}</span><div class="bar"><i style="width:{{ $photos ? min(100, ($n / $photos) * 100) : 0 }}%"></i></div><b>{{ $n }}</b></div>
 @endforeach
 </section>
+@unless(\App\Support\Geo::hidesPhotos(auth()->user()))
 <section class="panel"><div class="panel-head"><h2>Fotos recentes</h2></div>
 @forelse($recentPhotos as $p)
 <a class="activity" href="{{ route('os.show', $p->order) }}"><img loading="lazy" src="{{ route('photos.file', [$p, 'size' => 'thumb']) }}" alt=""><div><b>OS{{ $p->order->number }}</b><span>{{ $p->stage }}</span><small>{{ $p->user->name }} · {{ $p->captured_at->format('d/m/Y H:i') }}</small></div></a>
 @empty<p class="muted">Nenhuma foto ainda.</p>@endforelse
 </section>
+@endunless
 @if(auth()->user()->canAudit())
 <section class="panel"><div class="panel-head row-between"><h2>Atividades recentes</h2><a href="{{ route('audit.index') }}" class="link">Ver tudo</a></div>
 @forelse($recentActivity as $log)

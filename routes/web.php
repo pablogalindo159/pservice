@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AlertController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
@@ -49,4 +50,6 @@ Route::middleware('auth')->group(function () {
     Route::patch('/usuarios/{user}/toggle', [UserController::class, 'toggle'])->name('users.toggle');
 
     Route::get('/auditoria', [AuditController::class, 'index'])->name('audit.index');
+    Route::get('/alertas', [AlertController::class, 'index'])->name('alerts.index');
+    Route::post('/alertas/vistos', [AlertController::class, 'seen'])->name('alerts.seen');
 });

@@ -31,6 +31,24 @@ class Geo
         return Setting::get('geo_enabled') === '1' && self::configured();
     }
 
+    /** O que acontece fora da área: "photos" (só envia fotos, não vê) ou "block" (bloqueia tudo). */
+    public static function mode(): string
+    {
+        return Setting::get('geo_mode') === 'block' ? 'block' : 'photos';
+    }
+
+    /** Verificação válida e dentro da área nesta sessão. */
+    public static function isInside(): bool
+    {
+        return (bool) (self::current()['inside'] ?? false);
+    }
+
+    /** Usuário restrito que, agora, não pode ver fotos (fora da área ou sem localização confirmada). */
+    public static function hidesPhotos(?User $user): bool
+    {
+        return self::appliesTo($user) && ! self::isInside();
+    }
+
     public static function radius(): int
     {
         return max(20, (int) Setting::get('geo_radius', '150'));

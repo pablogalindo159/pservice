@@ -10,7 +10,7 @@
 
 <div class="panel geo-settings">
     <h2>📍 Área da empresa</h2>
-    <p class="muted">Perfis <b>{{ $presos }}</b> só usam o sistema dentro deste raio. Fora dele, conseguem entrar (fica registrado na auditoria), mas não veem OS nem fotos. <b>{{ $livres }}</b> acessam de qualquer lugar.</p>
+    <p class="muted">Vale para os perfis <b>{{ $presos }}</b>. <b>{{ $livres }}</b> acessam de qualquer lugar. Todo acesso fora da área gera um alerta no 🔔 para Admin e Gerente.</p>
 
     <form method="post" action="{{ route('settings.save') }}" id="geoForm">@csrf
         <label class="switch"><input type="checkbox" name="enabled" value="1" @checked(old('enabled', $enabled))> Restrição por área ativada</label>
@@ -21,6 +21,12 @@
         </div>
         <button type="button" class="secondary full" id="geoHere">📍 Usar minha localização atual</button>
         <p class="geo-status" id="geoStatus" hidden></p>
+
+        <fieldset class="geo-mode">
+            <legend>Fora da área:</legend>
+            <label class="opt"><input type="radio" name="mode" value="photos" @checked(old('mode', $mode) === 'photos')> <span><b>Só enviar fotos</b> (recomendado)<small>Pode abrir as OS e enviar fotos, mas não vê, não baixa e não altera nada.</small></span></label>
+            <label class="opt"><input type="radio" name="mode" value="block" @checked(old('mode', $mode) === 'block')> <span><b>Bloquear tudo</b><small>Entra, mas não usa nada até voltar para a área.</small></span></label>
+        </fieldset>
 
         <label>Raio (metros)<input type="number" name="radius" value="{{ old('radius', $radius) }}" min="50" max="5000" step="10"></label>
 

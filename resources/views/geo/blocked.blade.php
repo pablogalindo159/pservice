@@ -10,7 +10,7 @@
     <p id="geoText">
         @if($outside)
             @if($geo['distance'] !== null)
-                Você está a <b>{{ \App\Support\Geo::formatDistance($geo['distance']) }}</b> da empresa. O acesso é liberado num raio de {{ $radius }} m.
+                Você está a <b>{{ \App\Support\Geo::formatDistance($geo['distance']) }}</b> da empresa. O acesso completo é liberado num raio de {{ $radius }} m.
             @else
                 {{ $geo['reason'] }}
             @endif
@@ -18,7 +18,8 @@
             Seu perfil só acessa o sistema dentro da empresa. Permita o acesso à localização quando o celular perguntar.
         @endif
     </p>
-    <button type="button" class="primary full" id="geoRetry">Verificar de novo</button>
+    <a class="primary full geo-continue" id="geoContinue" href="{{ session('url.intended', route('dashboard')) }}" @if(! ($outside && $mode === 'photos')) hidden @endif>Continuar (só envio de fotos)</a>
+    <button type="button" @class(['full', 'primary' => $mode !== 'photos', 'secondary' => $mode === 'photos']) id="geoRetry">Verificar de novo</button>
     <details class="geo-help">
         <summary>A localização foi bloqueada?</summary>
         <p><b>iPhone:</b> Ajustes → Privacidade e Segurança → Serviços de Localização → ative e, em Sites do Safari, escolha "Ao Usar". Depois, no Safari, toque em "aA" na barra de endereço → Ajustes do Site → Localização → Permitir.</p>
@@ -28,6 +29,7 @@
 </div>
 <script>
 (() => {
+  const cont = document.getElementById('geoContinue'), photosMode = @json($mode === 'photos');
   const box = document.getElementById('geoBox'), title = document.getElementById('geoTitle'), text = document.getElementById('geoText'), icon = document.getElementById('geoIcon'), btn = document.getElementById('geoRetry');
   const send = (body) => fetch(box.dataset.checkUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': box.dataset.token }, body: JSON.stringify(body) }).then((r) => r.json());
   const run = () => {
@@ -35,8 +37,10 @@
     const done = (r) => {
       btn.disabled = false;
       if (r.inside) { title.textContent = 'Localização confirmada'; icon.textContent = '✅'; location.href = r.redirect; return; }
-      icon.textContent = '🚫'; title.textContent = 'Fora da área da empresa';
-      text.textContent = r.reason && !r.distance.match(/\d/) ? r.reason : `Você está a ${r.distance} da empresa. O acesso é liberado num raio de {{ $radius }} m.`;
+      icon.textContent = photosMode ? '📷' : '🚫'; title.textContent = 'Fora da área da empresa';
+      const where = r.reason && !r.distance.match(/\d/) ? r.reason : `Você está a ${r.distance} da empresa (raio liberado: {{ $radius }} m).`;
+      text.textContent = photosMode ? `${where} Você pode enviar fotos, mas não visualizá-las.` : where;
+      if (photosMode && r.redirect) { cont.href = r.redirect; cont.hidden = false; }
     };
     const fail = () => { btn.disabled = false; text.textContent = 'Falha de conexão. Tente de novo.'; };
     if (!navigator.geolocation) return send({ error: 'indisponivel' }).then(done, fail);
