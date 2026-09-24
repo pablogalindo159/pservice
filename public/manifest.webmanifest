@@ -1,3 +1,17 @@
 {
-"name":"PService","short_name":"PService","start_url":"/dashboard","display":"standalone","background_color":"#f5f7fb","theme_color":"#0d5bd7","icons":[]
+  "name": "PService — Registro fotográfico de OS",
+  "short_name": "PService",
+  "id": "/dashboard",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f7fb",
+  "theme_color": "#0b1e3a",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
 }

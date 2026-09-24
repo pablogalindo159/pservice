@@ -1,1 +1,10 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PService</title><link rel="stylesheet" href="/css/pservice.css"></head><body class="auth-page"><div class="auth-card"><img src="/assets/logo.jpeg"><h1>PService</h1><p>Registro fotográfico de OS</p>@if(session('ok'))<div class="alert">{{session('ok')}}</div>@endif @if($errors->any())<div class="alert error">{{$errors->first()}}</div>@endif<form method="post" action="{{route('login.attempt')}}">@csrf<label>E-mail<input type="email" name="email" required autofocus></label><label>Senha<input type="password" name="password" required></label><button class="primary full">Entrar</button></form><a class="forgot" href="{{route('password.request')}}">Esqueci minha senha</a></div></body></html>
+@extends('layouts.auth')
+@section('content')
+<h1>PService</h1><p>Registro fotográfico de OS</p>
+<form method="post" action="{{ route('login.attempt') }}">@csrf
+<label>E-mail<input type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username"></label>
+<label>Senha<input type="password" name="password" required autocomplete="current-password"></label>
+<label class="check"><input type="checkbox" name="remember" value="1"> Manter conectado</label>
+<button class="primary full">Entrar</button></form>
+<a class="forgot" href="{{ route('password.request') }}">Esqueci minha senha</a>
+@endsection
