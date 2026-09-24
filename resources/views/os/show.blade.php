@@ -29,7 +29,7 @@
 
 <nav class="stage-tabs" id="stageTabs" aria-label="Etapas">
 @foreach($stages as $stage)
-    @php($n = ($photos[$stage] ?? collect())->count())
+    @php $n = ($photos[$stage] ?? collect())->count(); @endphp
     <button type="button" class="stage-tab" data-tab="{{ $os->stageAnchor($stage) }}"><span class="ok" @if(! $n) hidden @endif>✓</span>{{ $loop->iteration }}. {{ $stage }}<span class="n" @if(! $n) hidden @endif>{{ $n }}</span></button>
 @endforeach
 </nav>
@@ -50,7 +50,7 @@
     @endif
     <div class="thumbs photo-grid">
     @foreach($items as $photo)
-        @php($v = $photo->toViewerArray($canDelete))
+        @php $v = $photo->toViewerArray($canDelete); @endphp
         <div class="photo" data-view="{{ $v['view'] }}" data-original="{{ $v['original'] }}" data-caption="{{ $v['caption'] }}" @if($v['delete']) data-delete="{{ $v['delete'] }}" @endif><img loading="lazy" src="{{ $v['thumb'] }}" alt=""><span class="lb">{{ $v['label'] }}</span></div>
     @endforeach
     </div>
