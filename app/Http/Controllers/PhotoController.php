@@ -38,6 +38,8 @@ class PhotoController extends Controller
             return response()->json([
                 'ok' => true,
                 'photos' => collect($saved)->map(fn (Photo $p) => $p->toViewerArray($request->user()->canDeletePhotos())),
+                'os_status' => $os->status,
+                'os_status_label' => $os->status_label,
             ]);
         }
 
@@ -96,6 +98,9 @@ class PhotoController extends Controller
 
             if ($os->status === 'aberta') {
                 $os->update(['status' => 'em_andamento']);
+                AuditLog::record('os.status_changed', $os->id, null, [
+                    'from' => 'aberta', 'to' => 'em_andamento', 'auto' => true, 'motivo' => 'primeira foto',
+                ]);
             }
 
             AuditLog::record('photo.added', $os->id, $photo->id, ['stage' => $stage, 'filename' => $filename]);

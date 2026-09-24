@@ -40,7 +40,7 @@ class AuditLog extends Model
 
     public function getActionLabelAttribute(): string
     {
-        return [
+        return ([
             'auth.login' => 'Login',
             'auth.logout' => 'Logout',
             'os.created' => 'OS criada',
@@ -52,6 +52,6 @@ class AuditLog extends Model
             'user.updated' => 'Usuário alterado',
             'user.toggled' => 'Usuário ativado/desativado',
             'user.password_reset' => 'Senha redefinida',
-        ][$this->action] ?? $this->action;
+        ][$this->action] ?? $this->action).(($this->metadata['auto'] ?? false) ? ' (automático)' : '');
     }
 }

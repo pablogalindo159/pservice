@@ -45,6 +45,19 @@
     });
     const bar = $('#osProgress'), txt = $('#osProgressText');
     if (bar && panels.length) { bar.style.width = Math.round(done / panels.length * 100) + '%'; txt.textContent = `${done} de ${panels.length} etapas`; }
+    // Aviso de finalização automática: foto na última etapa e OS Aberta/Em andamento
+    const note = $('#autoNote'), last = panels[panels.length - 1];
+    if (note && last) note.hidden = !(last.querySelector('.photo[data-view]') && ['aberta', 'em_andamento'].includes($('.os-head')?.dataset.status));
+  };
+
+  // Status do topo acompanha mudanças automáticas feitas pelo servidor
+  const setStatus = (value, label) => {
+    const head = $('.os-head'); if (!head || !value || head.dataset.status === value) return;
+    head.dataset.status = value;
+    const sel = $('.status-pill', head);
+    if (sel) { sel.value = value; sel.className = sel.className.replace(/\bst-\S+/, 'st-' + value); }
+    const badge = $('.badge', head);
+    if (badge) { badge.textContent = label || value; badge.className = badge.className.replace(/\bst-\S+/, 'st-' + value); }
   };
 
   // Visualizador: navegação entre fotos da etapa + original em alta resolução.
@@ -216,6 +229,7 @@
           try {
             const res = await sendOne(form, j.f, (p) => { $('.ring', j.el).textContent = Math.round(p * 100) + '%'; });
             if (res.photos?.[0]) fillPhoto(j.el, res.photos[0]); else j.el.classList.remove('uploading');
+            setStatus(res.os_status, res.os_status_label);
             URL.revokeObjectURL(j.url);
             break;
           } catch (err) {

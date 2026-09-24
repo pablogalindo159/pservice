@@ -143,6 +143,71 @@ class PServiceTest extends TestCase
         $this->get('/usuarios?q=ninguem')->assertSee('Nenhum usuário encontrado');
     }
 
+    private function fotoEm(ServiceOrder $os, string $stage): Photo
+    {
+        $user = User::first() ?? User::factory()->create();
+        $p = Photo::create([
+            'service_order_id' => $os->id, 'user_id' => $user->id, 'stage' => $stage,
+            'original_path' => "photos/{$os->number}/x_01.jpg", 'thumbnail_path' => 't.jpg',
+            'mime_type' => 'image/jpeg', 'captured_at' => now(),
+        ]);
+        AuditLog::record('photo.added', $os->id, $p->id, ['stage' => $stage]);
+
+        return $p;
+    }
+
+    public function test_finalizacao_automatica_apos_24h_sem_alteracoes(): void
+    {
+        $this->travelTo(now()->subHours(25));
+        $parada = ServiceOrder::create(['number' => '100', 'client_name' => 'A', 'status' => 'em_andamento']);
+        $this->fotoEm($parada, 'Finalização');
+        $aguardando = ServiceOrder::create(['number' => '101', 'client_name' => 'B', 'status' => 'aguardando']);
+        $this->fotoEm($aguardando, 'Finalização');
+        $mexida = ServiceOrder::create(['number' => '102', 'client_name' => 'C', 'status' => 'em_andamento']);
+        $this->fotoEm($mexida, 'Finalização');
+        $semFinal = ServiceOrder::create(['number' => '103', 'client_name' => 'D', 'status' => 'em_andamento']);
+        $this->fotoEm($semFinal, 'Testes');
+        $this->travelBack();
+
+        $this->travelTo(now()->subHours(2));
+        $this->fotoEm($mexida, 'Testes');          // alguém mexeu há 2h
+        $this->travelBack();
+
+        $this->artisan('pservice:auto-finalizar')->assertSuccessful();
+
+        $this->assertSame('finalizada', $parada->fresh()->status);
+        $this->assertSame('aguardando', $aguardando->fresh()->status);
+        $this->assertSame('em_andamento', $mexida->fresh()->status);
+        $this->assertSame('em_andamento', $semFinal->fresh()->status);
+
+        $log = AuditLog::where('service_order_id', $parada->id)->where('action', 'os.status_changed')->firstOrFail();
+        $this->assertNull($log->user_id);
+        $this->assertTrue($log->metadata['auto']);
+        $this->assertSame('Status alterado (automático)', $log->action_label);
+    }
+
+    public function test_simular_nao_altera(): void
+    {
+        $this->travelTo(now()->subHours(30));
+        $os = ServiceOrder::create(['number' => '200', 'client_name' => 'A', 'status' => 'em_andamento']);
+        $this->fotoEm($os, 'Finalização');
+        $this->travelBack();
+
+        $this->artisan('pservice:auto-finalizar --simular')->assertSuccessful();
+        $this->assertSame('em_andamento', $os->fresh()->status);
+    }
+
+    public function test_primeira_foto_muda_status_e_registra_automatico(): void
+    {
+        Storage::fake('local');
+        $os = ServiceOrder::create(['number' => '300', 'client_name' => 'C']);
+        $this->actingAs(User::factory()->role('technician')->create())
+            ->postJson("/os/{$os->number}/photos", ['stage' => 'Entrada', 'photos' => [UploadedFile::fake()->image('a.jpg')]])
+            ->assertOk()->assertJson(['os_status' => 'em_andamento']);
+
+        $this->assertTrue(AuditLog::where('service_order_id', $os->id)->where('action', 'os.status_changed')->where('metadata->auto', true)->exists());
+    }
+
     public function test_foto_exige_login(): void
     {
         $user = User::factory()->create();

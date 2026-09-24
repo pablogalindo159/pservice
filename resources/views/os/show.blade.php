@@ -5,8 +5,10 @@
     $me = auth()->user();
     $canDelete = $me->canDeletePhotos();
     $done = collect($stages)->filter(fn ($s) => ($photos[$s] ?? collect())->isNotEmpty())->count();
+    $autoHours = config('pservice.auto_finalize_hours');
+    $autoNote = $autoHours > 0 && in_array($os->status, ['aberta', 'em_andamento'], true) && ($photos[last($stages)] ?? collect())->isNotEmpty();
 @endphp
-<div class="os-head">
+<div class="os-head" data-status="{{ $os->status }}">
     <a class="os-back" href="{{ route('os.index') }}" aria-label="Voltar para a lista">←</a>
     <div class="os-title">
         <h1>OS{{ $os->number }}</h1>
@@ -26,6 +28,9 @@
     <div class="bar"><i id="osProgress" style="width: {{ round($done / max(count($stages), 1) * 100) }}%"></i></div>
     <span id="osProgressText">{{ $done }} de {{ count($stages) }} etapas</span>
 </div>
+@if($autoHours > 0)
+<p class="auto-note" id="autoNote" @if(! $autoNote) hidden @endif>⏱ Já tem foto na {{ last($stages) }}: a OS passa para <b>Finalizada</b> sozinha após {{ $autoHours }}h sem alterações.</p>
+@endif
 
 <nav class="stage-tabs" id="stageTabs" aria-label="Etapas">
 @foreach($stages as $stage)

@@ -20,6 +20,11 @@ return [
         'viewer' => 'Visualizador',
     ],
 
+    // Finalização automática: OS com foto na última etapa (Finalização) e sem
+    // alterações por este número de horas passa para "Finalizada".
+    // Só vale para OS Aberta ou Em andamento ("Aguardando" é uma pausa manual e é respeitada).
+    'auto_finalize_hours' => (int) env('PSERVICE_AUTO_FINALIZE_HOURS', 24),
+
     'upload' => [
         'max_kb' => (int) env('PSERVICE_UPLOAD_MAX_KB', 40960), // por foto
         'thumb_width' => 480,
