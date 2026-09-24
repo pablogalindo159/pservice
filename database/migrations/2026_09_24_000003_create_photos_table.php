@@ -1,0 +1,3 @@
+<?php
+use Illuminate\Database\Migrations\Migration; use Illuminate\Database\Schema\Blueprint; use Illuminate\Support\Facades\Schema;
+return new class extends Migration {public function up():void{Schema::create('photos',function(Blueprint $t){$t->id();$t->foreignId('service_order_id')->constrained()->cascadeOnDelete();$t->foreignId('user_id')->constrained()->restrictOnDelete();$t->string('stage',40)->index();$t->string('original_path');$t->string('thumbnail_path');$t->string('original_name')->nullable();$t->string('mime_type',100);$t->unsignedBigInteger('size')->default(0);$t->timestamp('captured_at')->index();$t->softDeletes();$t->timestamps();});}public function down():void{Schema::dropIfExists('photos');}};
