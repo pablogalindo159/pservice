@@ -94,10 +94,6 @@ class PhotoController extends Controller
                 'mime_type' => $file->getMimeType(),
                 'size' => $file->getSize(),
                 'captured_at' => $now,
-                // Localização confirmada nesta sessão (perfis presos à área)
-                'geo_lat' => \App\Support\Geo::current()['lat'] ?? null,
-                'geo_lng' => \App\Support\Geo::current()['lng'] ?? null,
-                'geo_distance' => \App\Support\Geo::current()['distance'] ?? null,
             ]);
 
             if ($os->status === 'aberta') {

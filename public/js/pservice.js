@@ -241,8 +241,6 @@
     form.querySelectorAll('input[type=file]').forEach((input) => input.addEventListener('change', async () => {
       const files = [...input.files]; input.value = '';
       if (!files.length || !grid) return;
-      // Confirma a localização antes de enviar (perfis presos à área)
-      if (geoOn && Date.now() - geoLast > 60000 && !(await geoGuard())) return;
       const jobs = files.map((f) => {
         const el = document.createElement('div');
         const url = URL.createObjectURL(f);

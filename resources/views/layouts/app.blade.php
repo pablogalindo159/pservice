@@ -36,5 +36,5 @@
 @yield('content')
 </main>
 </div></div>
-<script src="/js/pservice.js?v=11"></script>
+<script src="/js/pservice.js?v=12"></script>
 </body></html>
