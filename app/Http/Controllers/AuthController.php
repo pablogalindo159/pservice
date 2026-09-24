@@ -1,4 +1,53 @@
 <?php
+
 namespace App\Http\Controllers;
-use Illuminate\Http\Request;use Illuminate\Support\Facades\Auth;use Illuminate\Support\Facades\RateLimiter;use Illuminate\Support\Str;
-class AuthController extends Controller{public function showLogin(){return view('auth.login');}public function login(Request $request){$data=$request->validate(['email'=>'required|email','password'=>'required|string']);$key=Str::lower($data['email']).'|'.$request->ip();if(RateLimiter::tooManyAttempts($key,5))return back()->withErrors(['email'=>'Muitas tentativas. Aguarde.'])->onlyInput('email');$user=\App\Models\User::where('email',$data['email'])->first();if(!$user||!$user->active||!Auth::attempt(['email'=>$data['email'],'password'=>$data['password']],$request->boolean('remember'))){RateLimiter::hit($key,60);return back()->withErrors(['email'=>'E-mail ou senha inválidos ou usuário inativo.'])->onlyInput('email');}RateLimiter::clear($key);$request->session()->regenerate();return redirect()->intended(route('dashboard'));}public function logout(Request $request){Auth::logout();$request->session()->invalidate();$request->session()->regenerateToken();return redirect()->route('login');}}
+
+use App\Models\AuditLog;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
+
+class AuthController extends Controller
+{
+    public function showLogin()
+    {
+        return view('auth.login');
+    }
+
+    public function login(Request $request)
+    {
+        $data = $request->validate(['email' => 'required|email', 'password' => 'required|string']);
+        $key = Str::lower($data['email']).'|'.$request->ip();
+
+        if (RateLimiter::tooManyAttempts($key, 5)) {
+            $wait = RateLimiter::availableIn($key);
+
+            return back()->withErrors(['email' => "Muitas tentativas. Aguarde {$wait} segundos."])->onlyInput('email');
+        }
+
+        $user = User::where('email', $data['email'])->first();
+        if (! $user || ! $user->active || ! Auth::attempt(['email' => $data['email'], 'password' => $data['password']], $request->boolean('remember'))) {
+            RateLimiter::hit($key, 60);
+
+            return back()->withErrors(['email' => 'E-mail ou senha inválidos ou usuário inativo.'])->onlyInput('email');
+        }
+
+        RateLimiter::clear($key);
+        $request->session()->regenerate();
+        AuditLog::record('auth.login');
+
+        return redirect()->intended(route('dashboard'));
+    }
+
+    public function logout(Request $request)
+    {
+        AuditLog::record('auth.logout');
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->route('login');
+    }
+}

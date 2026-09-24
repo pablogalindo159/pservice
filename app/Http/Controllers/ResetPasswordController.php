@@ -1,4 +1,33 @@
 <?php
+
 namespace App\Http\Controllers;
-use Illuminate\Http\Request;use Illuminate\Support\Facades\Hash;use Illuminate\Support\Facades\Password;use Illuminate\Support\Str;
-class ResetPasswordController extends Controller{public function show(Request $request,string $token){return view('auth.reset-password',['token'=>$token,'email'=>$request->query('email','')]);}public function reset(Request $request){$data=$request->validate(['token'=>'required','email'=>'required|email','password'=>'required|string|min:8|confirmed']);$status=Password::reset($data,function($user,$password){$user->forceFill(['password'=>Hash::make($password),'remember_token'=>Str::random(60)])->save();});return $status===Password::PASSWORD_RESET?redirect()->route('login')->with('ok','Senha redefinida.'):back()->withErrors(['email'=>'Token inválido ou expirado.']);}}
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
+
+class ResetPasswordController extends Controller
+{
+    public function show(Request $request, string $token)
+    {
+        return view('auth.reset-password', ['token' => $token, 'email' => $request->query('email', '')]);
+    }
+
+    public function reset(Request $request)
+    {
+        $data = $request->validate([
+            'token' => 'required',
+            'email' => 'required|email',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $status = Password::reset($data, function ($user, $password) {
+            $user->forceFill(['password' => Hash::make($password), 'remember_token' => Str::random(60)])->save();
+        });
+
+        return $status === Password::PASSWORD_RESET
+            ? redirect()->route('login')->with('ok', 'Senha redefinida.')
+            : back()->withErrors(['email' => 'Token inválido ou expirado.']);
+    }
+}
