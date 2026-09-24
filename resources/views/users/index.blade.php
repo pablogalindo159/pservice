@@ -8,9 +8,16 @@
 <input type="password" name="password" placeholder="Senha (mín. 8)" minlength="8" required autocomplete="new-password">
 <select name="role">@foreach(config('pservice.roles') as $k => $label)<option value="{{ $k }}" @selected(old('role', 'technician') === $k)>{{ $label }}</option>@endforeach</select>
 <button class="primary">Criar</button></form></div>
+<form class="searchbar user-search" method="get" action="{{ route('users.index') }}">
+<input type="search" name="q" value="{{ $q }}" placeholder="🔎  Buscar por nome ou e-mail" inputmode="search" autocomplete="off">
+<select name="role" onchange="this.form.submit()" aria-label="Perfil"><option value="">Todos os perfis</option>@foreach(config('pservice.roles') as $k => $label)<option value="{{ $k }}" @selected($role === $k)>{{ $label }}</option>@endforeach</select>
+<select name="status" onchange="this.form.submit()" aria-label="Situação"><option value="">Ativos e inativos</option><option value="ativo" @selected($status === 'ativo')>Só ativos</option><option value="inativo" @selected($status === 'inativo')>Só inativos</option></select>
+<button class="primary">Buscar</button>
+</form>
+<p class="result-count">{{ $users->total() }} usuário(s)@if($q || $role || $status) encontrado(s) · <a href="{{ route('users.index') }}">limpar filtros</a>@endif</p>
 <div class="panel table-wrap"><table>
 <tr><th>Nome / perfil</th><th>E-mail</th><th>Status</th><th>Nova senha</th><th></th></tr>
-@foreach($users as $u)
+@forelse($users as $u)
 <tr @class(['inactive' => ! $u->active])>
 <td><form class="inline" method="post" action="{{ route('users.update', $u) }}">@csrf @method('PATCH')<input name="name" value="{{ $u->name }}" required><select name="role">@foreach(config('pservice.roles') as $k => $label)<option value="{{ $k }}" @selected($u->role === $k)>{{ $label }}</option>@endforeach</select><button class="secondary">Salvar</button></form></td>
 <td>{{ $u->email }}</td>
@@ -18,7 +25,9 @@
 <td><form class="inline" method="post" action="{{ route('users.password', $u) }}">@csrf @method('PATCH')<input type="password" name="password" minlength="8" placeholder="••••••••" required autocomplete="new-password"><button class="secondary">Definir</button></form></td>
 <td>@if($u->id !== auth()->id())<form method="post" action="{{ route('users.toggle', $u) }}">@csrf @method('PATCH')<button class="secondary">{{ $u->active ? 'Desativar' : 'Ativar' }}</button></form>@endif</td>
 </tr>
-@endforeach
+@empty
+<tr><td colspan="5" class="muted">Nenhum usuário encontrado com esses filtros.</td></tr>
+@endforelse
 </table></div>
 <div class="pager">{{ $users->links('partials.pager') }}</div>
 @endsection

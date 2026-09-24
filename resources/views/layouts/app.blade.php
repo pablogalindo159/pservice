@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>@yield('title', 'PService')</title>
-<link rel="stylesheet" href="/css/pservice.css?v=7">
+<link rel="stylesheet" href="/css/pservice.css?v=8">
 </head>
 <body>
 @php($me = auth()->user())

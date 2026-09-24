@@ -123,3 +123,8 @@ form.inline select{padding:8px}form.inline .secondary{padding:8px 12px}
 .viewer-confirm form{display:flex;gap:8px;justify-content:flex-end}
 .viewer-confirm .danger{background:#b3261e;color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:700}
 @media(max-width:900px){.stage-tabs{margin:0 -18px 12px;padding:10px 18px}.photo-grid{grid-template-columns:repeat(3,1fr);gap:6px}.stage-panel{padding:12px;border-radius:16px}.os-title h1{font-size:22px}}
+/* busca de usuários */
+.user-search{margin:18px 0 6px}.user-search form,.user-search{display:flex;gap:9px;flex-wrap:wrap}
+.user-search input{flex:1 1 260px;padding:12px;border:1px solid #dce3ed;border-radius:10px;background:#fff}
+.result-count{margin:4px 2px 0;color:#69778c;font-size:13px}.result-count a{color:#0d5bd7;text-decoration:none;font-weight:700}
+@media(max-width:900px){.user-search input{flex:1 1 100%}.user-search select{flex:1 1 40%}.user-search button{flex:1 1 100%}}

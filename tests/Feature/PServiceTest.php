@@ -130,6 +130,19 @@ class PServiceTest extends TestCase
         $this->get('/os/9999')->assertNotFound();
     }
 
+    public function test_busca_de_usuarios(): void
+    {
+        $admin = User::factory()->role('admin')->create(['name' => 'Pablo Admin']);
+        User::factory()->role('technician')->create(['name' => 'João Técnico', 'email' => 'joao@oficina.com']);
+        User::factory()->role('laboratory')->create(['name' => 'Maria Lab', 'active' => false]);
+
+        $this->actingAs($admin)->get('/usuarios?q=joao')->assertOk()->assertSee('João Técnico')->assertDontSee('Maria Lab');
+        $this->get('/usuarios?q=oficina.com')->assertSee('João Técnico');
+        $this->get('/usuarios?role=laboratory')->assertSee('Maria Lab')->assertDontSee('João Técnico');
+        $this->get('/usuarios?status=inativo')->assertSee('Maria Lab')->assertDontSee('João Técnico');
+        $this->get('/usuarios?q=ninguem')->assertSee('Nenhum usuário encontrado');
+    }
+
     public function test_foto_exige_login(): void
     {
         $user = User::factory()->create();

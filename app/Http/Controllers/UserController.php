@@ -21,12 +21,24 @@ class UserController extends Controller
         return ['required', Rule::in(array_keys(config('pservice.roles')))];
     }
 
-    public function index()
+    public function index(Request $request)
     {
         $this->admin();
-        $users = User::orderBy('name')->paginate(20);
+        $q = $request->string('q')->trim()->toString();
+        $role = $request->string('role')->toString();
+        $status = $request->string('status')->toString();
 
-        return view('users.index', compact('users'));
+        $users = User::query()
+            ->when($q, fn ($x) => $x->where(fn ($w) => $w
+                ->where('name', 'like', "%{$q}%")
+                ->orWhere('email', 'like', "%{$q}%")))
+            ->when(array_key_exists($role, config('pservice.roles')), fn ($x) => $x->where('role', $role))
+            ->when(in_array($status, ['ativo', 'inativo'], true), fn ($x) => $x->where('active', $status === 'ativo'))
+            ->orderBy('name')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('users.index', compact('users', 'q', 'role', 'status'));
     }
 
     public function store(Request $request)
