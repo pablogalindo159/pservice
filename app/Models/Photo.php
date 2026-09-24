@@ -16,6 +16,23 @@ class Photo extends Model
 
     protected $casts = ['captured_at' => 'datetime'];
 
+    /** Dados usados pela grade e pelo visualizador (a tela e o upload usam o mesmo formato). */
+    public function toViewerArray(bool $canDelete = false): array
+    {
+        $seq = preg_match('/_(\d+)\.[a-z0-9]+$/i', (string) $this->original_path, $m) ? $m[1] : null;
+        $time = $this->captured_at?->format('H:i');
+
+        return [
+            'id' => $this->id,
+            'thumb' => route('photos.file', [$this, 'size' => 'thumb']),
+            'view' => route('photos.file', [$this, 'size' => 'preview']),
+            'original' => route('photos.file', $this),
+            'caption' => $this->stage.' · '.($this->user?->name ?? '—').' · '.$this->captured_at?->format('d/m/Y H:i'),
+            'label' => $seq ? "{$seq} · {$time}" : (string) $time,
+            'delete' => $canDelete ? route('photos.destroy', $this) : null,
+        ];
+    }
+
     public function order()
     {
         return $this->belongsTo(ServiceOrder::class, 'service_order_id');

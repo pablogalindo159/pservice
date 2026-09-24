@@ -37,11 +37,7 @@ class PhotoController extends Controller
         if ($request->expectsJson()) {
             return response()->json([
                 'ok' => true,
-                'photos' => collect($saved)->map(fn (Photo $p) => [
-                    'id' => $p->id,
-                    'thumb' => route('photos.file', [$p, 'size' => 'thumb']),
-                    'preview' => route('photos.file', [$p, 'size' => 'preview']),
-                ]),
+                'photos' => collect($saved)->map(fn (Photo $p) => $p->toViewerArray($request->user()->canDeletePhotos())),
             ]);
         }
 

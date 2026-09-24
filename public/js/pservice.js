@@ -1,4 +1,5 @@
 (() => {
+  document.documentElement.classList.add('js');
   const $ = (s, el = document) => el.querySelector(s);
   const csrf = $('meta[name="csrf-token"]')?.content;
 
@@ -8,16 +9,43 @@
   $('#menuBtn')?.addEventListener('click', () => toggleMenu(!sidebar.classList.contains('open')));
   backdrop?.addEventListener('click', () => toggleMenu(false));
 
-  // Galerias: o endereço acompanha a etapa aberta (ex.: /os/1020#OS1020-entrada)
-  const openGallery = (id) => {
-    const g = document.getElementById(id); if (!g) return;
-    g.classList.toggle('open');
-    history.replaceState(history.state, '', g.classList.contains('open') ? '#' + id : location.pathname + location.search);
+  // Abas de etapas: o endereço acompanha a aba (ex.: /os/1020#OS1020-entrada)
+  const tabs = [...document.querySelectorAll('.stage-tab')];
+  const panels = [...document.querySelectorAll('[data-panel]')];
+  const tabBar = $('#stageTabs');
+  const selectTab = (id) => {
+    const p = panels.find((x) => x.id === id) || panels[0]; if (!p) return;
+    panels.forEach((x) => x.classList.toggle('active', x === p));
+    tabs.forEach((t) => {
+      const on = t.dataset.tab === p.id;
+      t.classList.toggle('on', on);
+      if (on && tabBar) tabBar.scrollLeft = t.offsetLeft - (tabBar.clientWidth - t.offsetWidth) / 2;
+    });
+    history.replaceState(history.state, '', '#' + p.id);
   };
-  if (location.hash.length > 1) {
-    const g = document.getElementById(decodeURIComponent(location.hash.slice(1)));
-    if (g?.classList.contains('gallery')) { g.classList.add('open'); g.closest('.stage')?.scrollIntoView(); }
+  tabs.forEach((t) => t.addEventListener('click', () => selectTab(t.dataset.tab)));
+  if (panels.length) {
+    const h = decodeURIComponent(location.hash.slice(1));
+    // Sem âncora: abre a próxima etapa ainda sem fotos (ou a última)
+    const next = panels.find((p) => !p.querySelector('.photo')) || panels[panels.length - 1];
+    selectTab(panels.some((p) => p.id === h) ? h : next.id);
   }
+
+  // Contadores: abas, rodapé da etapa e barra de progresso da OS
+  const refreshCounts = () => {
+    let done = 0;
+    panels.forEach((p) => {
+      const n = p.querySelectorAll('.photo[data-view]').length;
+      const t = tabs.find((x) => x.dataset.tab === p.id);
+      if (t) { const b = $('.n', t); b.textContent = n; b.hidden = !n; $('.ok', t).hidden = !n; }
+      const c = $('[data-count]', p); if (c) c.textContent = n;
+      const e = $('.empty', p); if (e) e.hidden = !!p.querySelector('.photo');
+      const dl = $('[data-dl]', p); if (dl) dl.hidden = !n;
+      if (n) done++;
+    });
+    const bar = $('#osProgress'), txt = $('#osProgressText');
+    if (bar && panels.length) { bar.style.width = Math.round(done / panels.length * 100) + '%'; txt.textContent = `${done} de ${panels.length} etapas`; }
+  };
 
   // Visualizador: navegação entre fotos da etapa + original em alta resolução.
   // Usa o histórico do navegador, então o "voltar" do celular sai do original
@@ -32,6 +60,7 @@
     const img = $('img', viewer);
     const origLink = $('[data-original-link]', viewer);
     origLink?.removeAttribute('target');
+    const delBtn = $('[data-delete-btn]', viewer), confirmBox = $('[data-confirm]', viewer), delForm = $('[data-delete-form]', viewer);
     const isOpen = () => viewer.classList.contains('open');
     const inOriginal = () => viewer.classList.contains('original');
 
@@ -45,6 +74,8 @@
       if (origLink) origLink.href = el.dataset.original;
       counter.textContent = items.length > 1 ? `${idx + 1} / ${items.length}` : '';
       viewer.classList.toggle('single', items.length < 2);
+      if (delBtn) delBtn.hidden = !el.dataset.delete;
+      if (confirmBox) confirmBox.hidden = true;
       preload(idx + 1); preload(idx - 1);
     };
 
@@ -93,12 +124,16 @@
     nextBtn.addEventListener('click', (e) => { e.stopPropagation(); show(idx + 1); });
     backBtn.addEventListener('click', (e) => { e.stopPropagation(); goBack(); });
     origLink?.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openOriginal(); });
+    delBtn?.addEventListener('click', (e) => { e.stopPropagation(); if (items[idx]?.dataset.delete) confirmBox.hidden = false; });
+    $('[data-confirm-no]', viewer)?.addEventListener('click', (e) => { e.stopPropagation(); confirmBox.hidden = true; });
+    delForm?.addEventListener('submit', () => {
+      const p = items[idx].closest('[data-panel]');
+      delForm.action = items[idx].dataset.delete + (p ? '#' + p.id : '');
+    });
     // No original, tocar na foto alterna entre caber na tela e zoom (com rolagem)
     img.addEventListener('click', (e) => { if (inOriginal()) { e.stopPropagation(); viewer.classList.toggle('zoomed'); } });
 
     document.addEventListener('click', (e) => {
-      const g = e.target.closest('[data-gallery]');
-      if (g) openGallery(g.dataset.gallery);
       const p = e.target.closest('[data-view]');
       if (p) {
         const list = [...(p.closest('.thumbs') || document).querySelectorAll('[data-view]')];
@@ -116,7 +151,7 @@
     // Deslizar: esquerda/direita troca a foto, para baixo fecha (desligado no original, onde o dedo move o zoom)
     let x0 = null, y0 = null;
     viewer.addEventListener('touchstart', (e) => {
-      if (inOriginal() || e.touches.length !== 1) { x0 = null; return; }
+      if (inOriginal() || e.touches.length !== 1 || (confirmBox && !confirmBox.hidden)) { x0 = null; return; }
       x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
     }, { passive: true });
     viewer.addEventListener('touchend', (e) => {
@@ -126,11 +161,6 @@
       if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) show(idx + (dx < 0 ? 1 : -1));
       else if (dy > 90 && Math.abs(dy) > Math.abs(dx)) closeAll();
     }, { passive: true });
-  } else {
-    document.addEventListener('click', (e) => {
-      const g = e.target.closest('[data-gallery]');
-      if (g) openGallery(g.dataset.gallery);
-    });
   }
 
   // Envio foto a foto: evita estourar o limite de POST do servidor
@@ -146,7 +176,7 @@
     xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
     xhr.upload.onprogress = (ev) => ev.lengthComputable && onProgress(ev.loaded / ev.total);
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) return resolve();
+      if (xhr.status >= 200 && xhr.status < 300) { try { return resolve(JSON.parse(xhr.responseText)); } catch { return resolve({}); } }
       let msg = 'Erro ' + xhr.status;
       try { const j = JSON.parse(xhr.responseText); msg = j.message || Object.values(j.errors || {})[0]?.[0] || msg; } catch {}
       if (xhr.status === 413) msg = 'Arquivo maior que o limite do servidor.';
@@ -157,36 +187,48 @@
     xhr.send(fd);
   });
 
+  const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fillPhoto = (el, v) => {
+    el.className = 'photo';
+    el.dataset.view = v.view; el.dataset.original = v.original; el.dataset.caption = v.caption;
+    if (v.delete) el.dataset.delete = v.delete;
+    el.innerHTML = `<img src="${esc(v.thumb)}" alt=""><span class="lb">${esc(v.label)}</span>`;
+  };
+
   document.querySelectorAll('form[data-upload]').forEach((form) => {
-    const status = $('.upload-status', form), bar = $('.bar i', status), label = $('span', status);
+    const grid = form.closest('[data-panel]')?.querySelector('.photo-grid');
     form.querySelectorAll('input[type=file]').forEach((input) => input.addEventListener('change', async () => {
-      const files = [...input.files]; if (!files.length) return;
-      form.querySelectorAll('input[type=file]').forEach((i) => (i.disabled = true));
-      status.hidden = false;
+      const files = [...input.files]; input.value = '';
+      if (!files.length || !grid) return;
+      const jobs = files.map((f) => {
+        const el = document.createElement('div');
+        const url = URL.createObjectURL(f);
+        el.className = 'photo uploading';
+        el.innerHTML = `<img src="${url}" alt=""><span class="ring">0%</span>`;
+        grid.appendChild(el);
+        return { f, el, url };
+      });
+      refreshCounts();
       const failed = [];
-      for (let i = 0; i < files.length; i++) {
+      for (const j of jobs) {
         let tries = 0;
         while (true) {
           try {
-            await sendOne(form, files[i], (p) => {
-              bar.style.width = (((i + p) / files.length) * 100).toFixed(0) + '%';
-              label.textContent = `Enviando ${i + 1} de ${files.length}…`;
-            });
+            const res = await sendOne(form, j.f, (p) => { $('.ring', j.el).textContent = Math.round(p * 100) + '%'; });
+            if (res.photos?.[0]) fillPhoto(j.el, res.photos[0]); else j.el.classList.remove('uploading');
+            URL.revokeObjectURL(j.url);
             break;
           } catch (err) {
             if (++tries < 3 && err.message === 'Falha de conexão') { await new Promise((r) => setTimeout(r, 1500 * tries)); continue; }
-            failed.push(`${files[i].name}: ${err.message}`); break;
+            j.el.classList.remove('uploading'); j.el.classList.add('failed');
+            $('.ring', j.el).textContent = 'Falhou';
+            failed.push(`${j.f.name}: ${err.message}`);
+            break;
           }
         }
+        refreshCounts();
       }
-      bar.style.width = '100%';
-      if (failed.length) {
-        label.textContent = `${files.length - failed.length} enviada(s), ${failed.length} com erro.`;
-        alert('Algumas fotos não foram enviadas:\n\n' + failed.join('\n'));
-      } else {
-        label.textContent = 'Concluído!';
-      }
-      location.reload();
+      if (failed.length) alert('Algumas fotos não foram enviadas:\n\n' + failed.join('\n'));
     }));
   });
 
