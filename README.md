@@ -6,7 +6,7 @@ Registro fotográfico de Ordens de Serviço, por etapas (Entrada → Desmontagem
 
 ## Funcionalidades
 
-- Login com perfis: Administrador, Gerente, Técnico, Operador, Visualizador
+- Login com perfis: Administrador, Gerente, Laboratório, Técnico, Visualizador
 - OS com número, cliente e status (Aberta, Em andamento, Aguardando, Finalizada, Cancelada)
 - Envio de fotos pela câmera ou galeria, **uma por requisição**, com barra de progresso e nova tentativa automática em caso de falha de rede
 - Original preservado + preview (1600 px) + miniatura (480 px)

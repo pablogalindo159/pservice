@@ -33,15 +33,39 @@ class PServiceTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_tecnico_nao_cria_os_operador_cria(): void
+    public function test_permissoes_por_perfil(): void
     {
-        $this->actingAs(User::factory()->role('technician')->create())
+        $esperado = [
+            //             criar OS, fotografar, excluir, baixar, auditoria
+            'admin' => [true, true, true, true, true],
+            'manager' => [true, true, true, true, true],
+            'operator' => [true, true, true, true, false],   // Laboratório
+            'technician' => [true, true, false, false, false],
+            'viewer' => [false, false, false, false, false],
+        ];
+        foreach ($esperado as $role => $p) {
+            $u = User::factory()->role($role)->make();
+            $this->assertSame($p, [$u->canCreateOs(), $u->canTakePhotos(), $u->canDeletePhotos(), $u->canDownload(), $u->canAudit()], $role);
+        }
+        $this->assertSame('Laboratório', User::factory()->role('operator')->make()->role_label);
+    }
+
+    public function test_tecnico_cria_os_visualizador_nao(): void
+    {
+        $this->actingAs(User::factory()->role('viewer')->create())
             ->post('/os', ['number' => '1', 'client_name' => 'X'])->assertForbidden();
 
-        $this->actingAs(User::factory()->role('operator')->create())
+        $this->actingAs(User::factory()->role('technician')->create())
             ->post('/os', ['number' => 'OS1020', 'client_name' => 'Cliente'])->assertRedirect();
 
         $this->assertDatabaseHas('service_orders', ['number' => '1020']);
+    }
+
+    public function test_visualizador_nao_baixa(): void
+    {
+        $os = ServiceOrder::create(['number' => '9', 'client_name' => 'C']);
+        $this->actingAs(User::factory()->role('viewer')->create())
+            ->get("/os/{$os->number}/photos/download-all")->assertForbidden();
     }
 
     public function test_numero_da_os_rejeita_caminho(): void

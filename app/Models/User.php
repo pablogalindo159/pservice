@@ -18,9 +18,11 @@ class User extends Authenticatable implements CanResetPasswordContract
 
     protected $casts = ['email_verified_at' => 'datetime', 'active' => 'boolean'];
 
+    // "operator" é exibido como Laboratório (config/pservice.php).
+
     public function canCreateOs(): bool
     {
-        return in_array($this->role, ['admin', 'manager', 'operator'], true);
+        return in_array($this->role, ['admin', 'manager', 'operator', 'technician'], true);
     }
 
     public function canTakePhotos(): bool
@@ -30,12 +32,12 @@ class User extends Authenticatable implements CanResetPasswordContract
 
     public function canDeletePhotos(): bool
     {
-        return in_array($this->role, ['admin', 'manager'], true);
+        return in_array($this->role, ['admin', 'manager', 'operator'], true);
     }
 
     public function canDownload(): bool
     {
-        return in_array($this->role, ['admin', 'manager', 'operator', 'viewer'], true);
+        return in_array($this->role, ['admin', 'manager', 'operator'], true);
     }
 
     public function canAudit(): bool
