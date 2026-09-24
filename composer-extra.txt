@@ -1,2 +1,0 @@
-Dependência para geração de thumbnails:
-composer require intervention/image-laravel

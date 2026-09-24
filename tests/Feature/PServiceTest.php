@@ -1,0 +1,118 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\AuditLog;
+use App\Models\Photo;
+use App\Models\ServiceOrder;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+class PServiceTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_login_e_dashboard(): void
+    {
+        $user = User::factory()->create(['email' => 'a@a.com']);
+
+        $this->post('/login', ['email' => 'a@a.com', 'password' => 'password123'])->assertRedirect('/dashboard');
+        $this->get('/dashboard')->assertOk()->assertSee('Visão geral');
+        $this->assertDatabaseHas('audit_logs', ['user_id' => $user->id, 'action' => 'auth.login']);
+    }
+
+    public function test_usuario_inativo_nao_entra_e_e_derrubado(): void
+    {
+        $user = User::factory()->create(['email' => 'b@b.com', 'active' => false]);
+        $this->post('/login', ['email' => 'b@b.com', 'password' => 'password123'])->assertSessionHasErrors('email');
+
+        $this->actingAs($user)->get('/dashboard')->assertRedirect('/login');
+        $this->assertGuest();
+    }
+
+    public function test_tecnico_nao_cria_os_operador_cria(): void
+    {
+        $this->actingAs(User::factory()->role('technician')->create())
+            ->post('/os', ['number' => '1', 'client_name' => 'X'])->assertForbidden();
+
+        $this->actingAs(User::factory()->role('operator')->create())
+            ->post('/os', ['number' => 'OS1020', 'client_name' => 'Cliente'])->assertRedirect();
+
+        $this->assertDatabaseHas('service_orders', ['number' => '1020']);
+    }
+
+    public function test_numero_da_os_rejeita_caminho(): void
+    {
+        $this->actingAs(User::factory()->role('admin')->create())
+            ->post('/os', ['number' => '../../x', 'client_name' => 'X'])->assertSessionHasErrors('number');
+    }
+
+    public function test_upload_gera_original_preview_miniatura_e_auditoria(): void
+    {
+        Storage::fake('local');
+        $user = User::factory()->role('technician')->create();
+        $os = ServiceOrder::create(['number' => '1020', 'client_name' => 'C']);
+
+        $this->actingAs($user)->postJson("/os/{$os->id}/photos", [
+            'stage' => 'Entrada',
+            'photos' => [UploadedFile::fake()->image('a.jpg', 2400, 1800)],
+        ])->assertOk()->assertJson(['ok' => true]);
+
+        $photo = Photo::firstOrFail();
+        $this->assertMatchesRegularExpression('#^photos/1020/ENTRADA/OS1020_ENTRADA_\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d_01\.jpg$#', $photo->original_path);
+        Storage::disk('local')->assertExists([$photo->original_path, $photo->preview_path, $photo->thumbnail_path]);
+        $this->assertSame('em_andamento', $os->fresh()->status);
+        $this->assertTrue(AuditLog::where('action', 'photo.added')->exists());
+    }
+
+    public function test_visualizador_nao_envia_foto_e_etapa_invalida_e_rejeitada(): void
+    {
+        $os = ServiceOrder::create(['number' => '5', 'client_name' => 'C']);
+        $file = UploadedFile::fake()->image('a.jpg');
+
+        $this->actingAs(User::factory()->role('viewer')->create())
+            ->post("/os/{$os->id}/photos", ['stage' => 'Entrada', 'photos' => [$file]])->assertForbidden();
+
+        $this->actingAs(User::factory()->role('technician')->create())
+            ->postJson("/os/{$os->id}/photos", ['stage' => 'Pintura', 'photos' => [$file]])->assertStatus(422);
+    }
+
+    public function test_exclusao_mantem_original_e_registra(): void
+    {
+        Storage::fake('local');
+        $manager = User::factory()->role('manager')->create();
+        $os = ServiceOrder::create(['number' => '7', 'client_name' => 'C']);
+        $this->actingAs($manager)->postJson("/os/{$os->id}/photos", ['stage' => 'Testes', 'photos' => [UploadedFile::fake()->image('t.jpg')]]);
+        $photo = Photo::firstOrFail();
+
+        $this->delete("/photos/{$photo->id}")->assertRedirect();
+
+        $this->assertSoftDeleted($photo);
+        Storage::disk('local')->assertExists($photo->original_path);
+        $this->assertTrue(AuditLog::where('action', 'photo.deleted')->where('photo_id', $photo->id)->exists());
+    }
+
+    public function test_foto_exige_login(): void
+    {
+        $user = User::factory()->create();
+        $os = ServiceOrder::create(['number' => '8', 'client_name' => 'C']);
+        $photo = Photo::create([
+            'service_order_id' => $os->id, 'user_id' => $user->id, 'stage' => 'Entrada',
+            'original_path' => 'x.jpg', 'thumbnail_path' => 'y.jpg', 'mime_type' => 'image/jpeg', 'captured_at' => now(),
+        ]);
+
+        $this->get("/photos/{$photo->id}/file")->assertRedirect('/login');
+    }
+
+    public function test_apenas_admin_gerencia_usuarios(): void
+    {
+        $this->actingAs(User::factory()->role('manager')->create())->get('/usuarios')->assertForbidden();
+
+        $admin = User::factory()->role('admin')->create();
+        $this->actingAs($admin)->get('/usuarios')->assertOk();
+        $this->patch("/usuarios/{$admin->id}", ['name' => 'Eu', 'role' => 'viewer'])->assertSessionHasErrors('role');
+    }
+}

@@ -1,7 +1,10 @@
 .env
+.env.backup
 /vendor/
 /node_modules/
 /public/storage
 /storage/*.key
-/storage/logs/*
-/bootstrap/cache/*
+.phpunit.result.cache
+.DS_Store
+.idea/
+.vscode/
