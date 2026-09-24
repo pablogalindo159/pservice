@@ -8,27 +8,75 @@
   $('#menuBtn')?.addEventListener('click', () => toggleMenu(!sidebar.classList.contains('open')));
   backdrop?.addEventListener('click', () => toggleMenu(false));
 
-  // Galerias e visualizador
-  const viewer = $('#viewer');
+  // Galerias
   const openGallery = (id) => {
     const g = document.getElementById(id); if (!g) return;
     g.classList.toggle('open');
     if (g.classList.contains('open')) history.replaceState(null, '', '#' + id);
   };
-  document.addEventListener('click', (e) => {
-    const g = e.target.closest('[data-gallery]');
-    if (g) openGallery(g.dataset.gallery);
-    const p = e.target.closest('[data-view]');
-    if (p && viewer) {
-      $('img', viewer).src = p.dataset.view;
-      $('.caption', viewer).textContent = p.dataset.caption || '';
-      $('[data-original-link]', viewer).href = p.dataset.original;
-      viewer.classList.add('open');
-    }
-    if (e.target.closest('[data-close]') || e.target === viewer) viewer?.classList.remove('open');
-  });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') viewer?.classList.remove('open'); });
   if (location.hash.startsWith('#gallery-')) document.getElementById(location.hash.slice(1))?.classList.add('open');
+
+  // Visualizador com navegação entre as fotos da mesma etapa
+  const viewer = $('#viewer');
+  let items = [], idx = 0;
+  if (viewer) {
+    const mk = (cls, label, html) => { const b = document.createElement('button'); b.className = cls; b.type = 'button'; b.setAttribute('aria-label', label); b.innerHTML = html; viewer.appendChild(b); return b; };
+    const prevBtn = mk('nav prev', 'Anterior', '‹'), nextBtn = mk('nav next', 'Próxima', '›');
+    const counter = document.createElement('span'); counter.className = 'counter'; viewer.appendChild(counter);
+    const img = $('img', viewer);
+    const preload = (i) => { if (items[i]) new Image().src = items[i].dataset.view; };
+    const show = (i) => {
+      if (!items.length) return;
+      idx = (i + items.length) % items.length;
+      const el = items[idx];
+      img.src = el.dataset.view;
+      $('.caption', viewer).textContent = el.dataset.caption || '';
+      $('[data-original-link]', viewer).href = el.dataset.original;
+      counter.textContent = items.length > 1 ? `${idx + 1} / ${items.length}` : '';
+      viewer.classList.toggle('single', items.length < 2);
+      preload(idx + 1); preload(idx - 1);
+    };
+    const close = () => viewer.classList.remove('open');
+    prevBtn.addEventListener('click', (e) => { e.stopPropagation(); show(idx - 1); });
+    nextBtn.addEventListener('click', (e) => { e.stopPropagation(); show(idx + 1); });
+
+    document.addEventListener('click', (e) => {
+      const g = e.target.closest('[data-gallery]');
+      if (g) openGallery(g.dataset.gallery);
+      const p = e.target.closest('[data-view]');
+      if (p) {
+        items = [...(p.closest('.thumbs') || document).querySelectorAll('[data-view]')];
+        viewer.classList.add('open');
+        show(items.indexOf(p));
+      }
+      if (e.target.closest('[data-close]') || e.target === viewer) close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (!viewer.classList.contains('open')) return;
+      if (e.key === 'Escape') close();
+      if (e.key === 'ArrowLeft') show(idx - 1);
+      if (e.key === 'ArrowRight') show(idx + 1);
+    });
+
+    // Deslizar o dedo: esquerda/direita troca a foto, para baixo fecha
+    let x0 = null, y0 = null;
+    viewer.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) { x0 = null; return; }   // pinça (zoom) não navega
+      x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+    }, { passive: true });
+    viewer.addEventListener('touchend', (e) => {
+      if (x0 === null) return;
+      const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+      x0 = null;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) show(idx + (dx < 0 ? 1 : -1));
+      else if (dy > 90 && Math.abs(dy) > Math.abs(dx)) close();
+    }, { passive: true });
+  } else {
+    document.addEventListener('click', (e) => {
+      const g = e.target.closest('[data-gallery]');
+      if (g) openGallery(g.dataset.gallery);
+    });
+  }
 
   // Envio foto a foto: evita estourar o limite de POST do servidor
   // e mostra progresso real no celular.

@@ -66,3 +66,12 @@ form.inline select{padding:8px}form.inline .secondary{padding:8px 12px}
 .thumbs{grid-template-columns:repeat(3,1fr)}
 .upload-buttons .camera-input{padding:20px 8px;font-size:16px}}
 .pager-nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pager-nav .disabled{opacity:.45}.pager-nav .page-info{background:none;border:0;color:#69778c}
+
+/* visualizador: navegação */
+.viewer{touch-action:pan-y pinch-zoom;user-select:none;-webkit-user-select:none}
+.viewer .nav{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:50%;padding:0;background:#ffffffd9;color:#111;font-size:32px;line-height:46px;text-align:center;box-shadow:0 4px 14px #0005}
+.viewer .nav.prev{left:12px}.viewer .nav.next{right:12px}
+.viewer.single .nav{display:none}
+.viewer .counter{position:absolute;top:22px;left:50%;transform:translateX(-50%);color:#fff;font-weight:800;font-size:14px;background:#0008;padding:5px 12px;border-radius:20px}
+.viewer.single .counter{display:none}
+@media(max-width:900px){.viewer .nav{width:42px;height:42px;font-size:28px;line-height:40px;background:#ffffffb3}.viewer .nav.prev{left:6px}.viewer .nav.next{right:6px}}
