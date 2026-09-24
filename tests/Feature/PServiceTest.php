@@ -39,7 +39,7 @@ class PServiceTest extends TestCase
             //             criar OS, fotografar, excluir, baixar, auditoria
             'admin' => [true, true, true, true, true],
             'manager' => [true, true, true, true, true],
-            'operator' => [true, true, true, true, false],   // Laboratório
+            'laboratory' => [true, true, true, true, false],
             'technician' => [true, true, false, false, false],
             'viewer' => [false, false, false, false, false],
         ];
@@ -47,7 +47,7 @@ class PServiceTest extends TestCase
             $u = User::factory()->role($role)->make();
             $this->assertSame($p, [$u->canCreateOs(), $u->canTakePhotos(), $u->canDeletePhotos(), $u->canDownload(), $u->canAudit()], $role);
         }
-        $this->assertSame('Laboratório', User::factory()->role('operator')->make()->role_label);
+        $this->assertSame('Laboratório', User::factory()->role('laboratory')->make()->role_label);
     }
 
     public function test_tecnico_cria_os_visualizador_nao(): void

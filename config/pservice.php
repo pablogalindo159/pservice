@@ -16,7 +16,7 @@ return [
         'admin' => 'Administrador',
         'manager' => 'Gerente',
         'technician' => 'Técnico',
-        'operator' => 'Laboratório',
+        'laboratory' => 'Laboratório',
         'viewer' => 'Visualizador',
     ],
 
